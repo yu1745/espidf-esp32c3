@@ -1,0 +1,10 @@
+使用"#pragma once"来避免头文件重复引入
+不要使用c++的stream
+使用ESP_LOGx而非std::cout来输出信息
+在使用命令时，记住运行环境是powershell，不是cmd也不是bash
+记住我在使用esp-idf版本v5.5.1,芯片是esp32c3
+优先使用std api而不是freertos api,比如malloc和pvPortMalloc
+在使用锁时，使用std::mutex和lock_guard，而不是使用freertos的mutex和xSemaphoreTake/xSemaphoreGive
+在使用命令时，如果要使用python，先执行conda init然后再执行conda activate base
+在多次修改后仍然报错时，使用context7 mcp来获取最新的代码
+使用context7获取espidf的文档时，id是"/websites/espressif_projects_esp-idf_en_stable_esp32c3"

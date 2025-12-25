@@ -1,0 +1,254 @@
+# #
+# # Main menu configuration options
+# #
+# mainmenu "ESP32 Project Configuration"
+
+# #
+# # Project Configuration Menu
+# #
+# menu "Project Configuration"
+
+# #
+# # WiFi Configuration
+# #
+# menu "WiFi Configuration"
+# config WIFI_SSID
+#     string "WiFi SSID"
+#     default "ZTE-Y55AcX"
+#     help
+#         The SSID of the WiFi network to connect to.
+
+# config WIFI_PASSWORD
+#     string "WiFi Password"
+#     default "asdk7788"
+#     help
+#         The password for the WiFi network.
+
+# config WIFI_ENABLED
+#     bool "Enable WiFi"
+#     default y
+#     help
+#         Enable WiFi connectivity in the project.
+
+# config WIFI_AUTO_CONNECT
+#     bool "Auto-connect to WiFi on startup"
+#     default y
+#     depends on WIFI_ENABLED
+#     help
+#         Automatically connect to configured WiFi network when the device starts.
+
+# config WIFI_RETRY_COUNT
+#     int "WiFi connection retry count"
+#     default 5
+#     range 1 20
+#     depends on WIFI_ENABLED
+#     help
+#         Number of times to retry connecting to WiFi before giving up.
+
+# config WIFI_RETRY_DELAY_MS
+#     int "Delay between WiFi retry attempts (ms)"
+#     default 2000
+#     range 500 10000
+#     depends on WIFI_ENABLED
+#     help
+#         Delay in milliseconds between WiFi connection retry attempts.
+
+# endmenu
+
+# #
+# # HTTP Server Configuration
+# #
+# menu "HTTP Server Configuration"
+# config HTTP_SERVER_ENABLED
+#     bool "Enable HTTP Server"
+#     default y
+#     help
+#         Enable the HTTP server functionality.
+
+# config HTTP_SERVER_PORT
+#     int "HTTP Server Port"
+#     default 80
+#     range 1 65535
+#     depends on HTTP_SERVER_ENABLED
+#     help
+#         The port number for the HTTP server.
+
+# config HTTP_SERVER_MAX_CONNECTIONS
+#     int "Maximum HTTP connections"
+#     default 5
+#     range 1 20
+#     depends on HTTP_SERVER_ENABLED
+#     help
+#         Maximum number of simultaneous HTTP connections.
+
+# endmenu
+
+# #
+# # WebSocket Server Configuration
+# #
+# menu "WebSocket Server Configuration"
+# config WEBSOCKET_SERVER_ENABLED
+#     bool "Enable WebSocket Server"
+#     default y
+#     depends on HTTP_SERVER_ENABLED
+#     help
+#         Enable the WebSocket server functionality.
+
+# config WEBSOCKET_BUFFER_SIZE
+#     int "WebSocket buffer size"
+#     default 1024
+#     range 256 8192
+#     depends on WEBSOCKET_SERVER_ENABLED
+#     help
+#         Size of the WebSocket message buffer in bytes.
+
+# config WEBSOCKET_MAX_CLIENTS
+#     int "Maximum WebSocket clients"
+#     default 5
+#     range 1 10
+#     depends on WEBSOCKET_SERVER_ENABLED
+#     help
+#         Maximum number of simultaneous WebSocket client connections.
+
+# config WEBSOCKET_BROADCAST_ENABLED
+#     bool "Enable WebSocket broadcast"
+#     default y
+#     depends on WEBSOCKET_SERVER_ENABLED
+#     help
+#         Enable broadcast functionality for WebSocket messages.
+
+# config WEBSOCKET_BROADCAST_INTERVAL_MS
+#     int "Broadcast interval (ms)"
+#     default 10000
+#     range 1000 60000
+#     depends on WEBSOCKET_BROADCAST_ENABLED
+#     help
+#         Interval in milliseconds between broadcast messages.
+
+# endmenu
+
+# #
+# # BLE Configuration
+# #
+# menu "BLE Configuration"
+# config BLE_ENABLED
+#     bool "Enable BLE"
+#     default y
+#     help
+#         Enable Bluetooth Low Energy functionality.
+
+# config BLE_DEVICE_NAME
+#     string "BLE Device Name"
+#     default "ESP32_Device"
+#     depends on BLE_ENABLED
+#     help
+#         The name that will be advertised by the BLE device.
+
+# config BLE_MAX_CONNECTIONS
+#     int "Maximum BLE connections"
+#     default 3
+#     range 1 5
+#     depends on BLE_ENABLED
+#     help
+#         Maximum number of simultaneous BLE connections.
+
+# config BLE_ADVERTISING_INTERVAL_MS
+#     int "BLE Advertising Interval (ms)"
+#     default 100
+#     range 20 10000
+#     depends on BLE_ENABLED
+#     help
+#         Interval in milliseconds for BLE advertising packets.
+
+# endmenu
+
+# #
+# # Memory Configuration
+# #
+# menu "Memory Configuration"
+# config MEMORY_TEST_ENABLED
+#     bool "Enable Memory Performance Tests"
+#     default n
+#     help
+#         Enable memory performance testing functions.
+
+# config MEMORY_TEST_SIZE
+#     int "Memory test size (bytes)"
+#     default 1024
+#     range 256 16384
+#     depends on MEMORY_TEST_ENABLED
+#     help
+#         Size of memory blocks used in performance tests.
+
+# config MEMORY_TEST_ITERATIONS
+#     int "Memory test iterations"
+#     default 1000
+#     range 100 10000
+#     depends on MEMORY_TEST_ENABLED
+#     help
+#         Number of iterations for memory performance tests.
+
+# endmenu
+
+# #
+# # Logging Configuration
+# #
+# menu "Logging Configuration"
+# config LOG_LEVEL
+#     int "Default log level"
+#     default 3
+#     range 0 5
+#     help
+#         Default log level for the application:
+#         0 = None (ESP_LOG_NONE)
+#         1 = Error (ESP_LOG_ERROR)
+#         2 = Warning (ESP_LOG_WARN)
+#         3 = Info (ESP_LOG_INFO)
+#         4 = Debug (ESP_LOG_DEBUG)
+#         5 = Verbose (ESP_LOG_VERBOSE)
+
+# config LOG_COLORS
+#     bool "Enable colored logs"
+#     default y
+#     help
+#         Enable colored output for log messages.
+
+# endmenu
+
+# #
+# # Performance Configuration
+# #
+# menu "Performance Configuration"
+# config MAIN_TASK_STACK_SIZE
+#     int "Main task stack size"
+#     default 4096
+#     range 2048 16384
+#     help
+#         Stack size for the main task in bytes.
+
+# config MAIN_TASK_PRIORITY
+#     int "Main task priority"
+#     default 5
+#     range 1 10
+#     help
+#         Priority for the main task (higher number = higher priority).
+
+# config BROADCAST_TASK_STACK_SIZE
+#     int "Broadcast task stack size"
+#     default 2048
+#     range 1024 8192
+#     depends on WEBSOCKET_BROADCAST_ENABLED
+#     help
+#         Stack size for the broadcast task in bytes.
+
+# config BROADCAST_TASK_PRIORITY
+#     int "Broadcast task priority"
+#     default 5
+#     range 1 10
+#     depends on WEBSOCKET_BROADCAST_ENABLED
+#     help
+#         Priority for the broadcast task (higher number = higher priority).
+
+# endmenu
+
+# endmenu

@@ -1,0 +1,79 @@
+# Build outputs
+build/
+sdkconfig
+sdkconfig.old
+
+# Dependencies
+managed_components/
+dependencies.lock
+
+# Compiled Object files
+*.o
+*.obj
+*.elf
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+
+# Executables
+*.exe
+*.out
+*.app
+*.bin
+*.hex
+
+# Debug files
+*.map
+*.dSYM
+*.su
+*.idb
+*.pdb
+
+# Editor directories and files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# IDE specific files
+*.sublime-project
+*.sublime-workspace
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+env/
+venv/
+ENV/
+.venv
+
+# Logs
+*.log
+logs/
+
+# ESP-IDF specific
+*.bin
+*.flash.bin
+*.flash_args
+*.flash_project_args
+
+# Test coverage
+.coverage
+.pytest_cache/
+htmlcov/
