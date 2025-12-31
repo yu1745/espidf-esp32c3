@@ -15,14 +15,6 @@ extern "C" {
 #define WEBSOCKET_SERVER_PORT 80
 #define WEBSOCKET_BUFFER_SIZE 1024
 
-// WebSocket消息类型
-typedef enum {
-    WEBSOCKET_TEXT = 0x1,
-    WEBSOCKET_BINARY = 0x2,
-    WEBSOCKET_PING = 0x9,
-    WEBSOCKET_PONG = 0xA,
-    WEBSOCKET_DISCONNECT = 0x8
-} websocket_frame_type_t;
 
 // WebSocket连接结构
 typedef struct {

@@ -1,13 +1,11 @@
 #pragma once
 
-#include "esp_event.h"
-#include "esp_netif.h"
-#include "esp_wifi.h"
-#include "nvs_flash.h"
+#include "esp_event_base.h"
+#include "esp_err.h"
 
 // WiFi配置
-#define WIFI_SSID "ZTE-Y55AcX"
-#define WIFI_PASS "asdk7788"
+// #define WIFI_SSID "ZTE-Y55AcX"
+// #define WIFI_PASS "asdk7788"
 
 // HTTP服务器初始化函数
 esp_err_t http_server_init(void);

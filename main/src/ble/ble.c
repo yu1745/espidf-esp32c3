@@ -8,8 +8,7 @@
 #include "ble/common.h"
 #include "ble/gap.h"
 #include "ble/gatt_svc.h"
-// #include "heart_rate.h"
-// #include "led.h"
+
 
 const static char* TAG = "BLE";
 
@@ -30,7 +29,7 @@ static void nimble_host_task(void* param);
  */
 static void on_stack_reset(int reason) {
     /* On reset, print reset reason to console */
-    ESP_LOGI(TAG, "nimble stack reset, reset reason: %d", reason);
+    ESP_LOGE(TAG, "nimble stack reset, reset reason: %d", reason);
 }
 
 static void on_stack_sync(void) {

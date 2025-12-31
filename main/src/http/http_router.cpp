@@ -28,10 +28,33 @@ void HttpRouter::registerEndpoint(const std::string& uri,
 static std::vector<http_handler_func_t> g_handler_storage;
 static std::vector<http_endpoint_t> g_endpoint_storage;
 
+// OPTIONS请求处理器 - 处理跨域预检请求
+static esp_err_t http_options_handler(httpd_req_t* req) {
+    // 设置跨域响应头
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Methods",
+                       "GET, POST, PUT, DELETE, OPTIONS");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Headers",
+                       "Content-Type, Authorization");
+    httpd_resp_set_hdr(req, "Access-Control-Max-Age", "86400");
+
+    // 返回200状态码
+    httpd_resp_send(req, NULL, 0);
+    ESP_LOGI(TAG, "处理OPTIONS预检请求: %s", req->uri);
+    return ESP_OK;
+}
+
 // 静态C风格处理器函数
 static esp_err_t http_request_handler(httpd_req_t* req) {
     size_t index = (size_t)req->user_ctx;
     if (index < g_handler_storage.size()) {
+        // 设置跨域响应头
+        httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+        httpd_resp_set_hdr(req, "Access-Control-Allow-Methods",
+                           "GET, POST, PUT, DELETE, OPTIONS");
+        httpd_resp_set_hdr(req, "Access-Control-Allow-Headers",
+                           "Content-Type, Authorization");
+
         auto now = static_cast<int>(esp_timer_get_time());
         auto ret = g_handler_storage[index](req);
         ESP_LOGI(TAG, "处理端点 %s [%d] 耗时: %.1f ms",
@@ -84,6 +107,21 @@ esp_err_t HttpRouter::registerAllEndpoints(httpd_handle_t server) {
         ESP_LOGI(TAG, "成功注册端点: %s [%d]", endpoint.uri.c_str(),
                  endpoint.method);
     }
+
+    // 注册OPTIONS预检请求处理器，匹配所有路径
+    httpd_uri_t options_handler = {0};
+    options_handler.uri = "*";
+    options_handler.method = HTTP_OPTIONS;
+    options_handler.handler = http_options_handler;
+    options_handler.user_ctx = NULL;
+
+    esp_err_t ret = httpd_register_uri_handler(server, &options_handler);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "注册OPTIONS处理器失败: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    ESP_LOGI(TAG, "成功注册OPTIONS预检处理器");
 
     ESP_LOGI(TAG, "所有HTTP端点注册完成");
     return ESP_OK;

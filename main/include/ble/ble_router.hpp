@@ -58,6 +58,10 @@ class BleRouter {
     // 获取已注册服务的数量
     size_t getServiceCount() const;
 
+    // 获取服务UUID列表（用于广告数据）
+    // 返回指向UUID数组的指针，count返回UUID数量
+    const ble_uuid_t** getServiceUuids(size_t* count) const;
+
     // 清空所有注册的服务
     void clearServices();
 
@@ -66,6 +70,9 @@ class BleRouter {
     ~BleRouter() = default;
     BleRouter(const BleRouter&) = delete;
     BleRouter& operator=(const BleRouter&) = delete;
+
+    // 以树形结构打印服务和特征值
+    void dumpServicesTree() const;
 
     std::vector<ble_service_t> services;
     std::vector<struct ble_gatt_svc_def> gatt_services;

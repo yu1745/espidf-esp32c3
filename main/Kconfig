@@ -1,0 +1,75 @@
+#
+# Main menu configuration options
+#
+mainmenu "configuration"
+
+# tcode-espidf feature configuration
+#
+menu "tcode-espidf feature configuration"
+
+config ENABLE_WIFI
+    bool "Enable WiFi"
+    default y
+    help
+        Enable WiFi functionality.
+
+config ENABLE_BLE
+    bool "Enable Bluetooth"
+    default y
+    help
+        Enable Bluetooth functionality.
+
+config ENABLE_LED
+    bool "Enable LED Control"
+    default y
+    help
+        Enable LED control functionality.
+
+config ENABLE_TEMP
+    bool "Enable Temperature Sensor"
+    default y
+    help
+        Enable temperature sensor functionality.
+
+config ENABLE_BUTTON
+    bool "Enable Button Support"
+    default y
+    help
+        Enable button input functionality.
+
+config ENABLE_VOLTAGE
+    bool "Enable Voltage Monitoring"
+    default y
+    help
+        Enable voltage monitoring functionality.
+
+config ENABLE_DECOY
+    bool "Enable Decoy Function"
+    default y
+    help
+        Enable decoy/voltage control function.
+
+choice SERVO_MODE
+    prompt "Servo Mode"
+    default SERVO_MODE_OSR
+    help
+        Select the servo control mode for your robot.
+
+    config SERVO_MODE_OSR
+        bool "OSR Mode"
+    config SERVO_MODE_TRR
+        bool "TrR Mode"
+    config SERVO_MODE_TRR_MAX
+        bool "TrR_MAX Mode"
+    config SERVO_MODE_ZDT
+        bool "ZDT Mode"
+    config SERVO_MODE_SR6
+        bool "SR6 Mode"
+    config SERVO_MODE_SR6_SHALI
+        bool "SR6_SHALI Mode"
+    config SERVO_MODE_SR6CAN
+        bool "SR6CAN Mode"
+
+endchoice
+
+endmenu

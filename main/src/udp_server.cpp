@@ -8,7 +8,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/task.h"
-#include "globals.h"
+#include "globals.hpp"
 #include "lwip/netdb.h"
 #include "lwip/sockets.h"
 #include "lwip/sys.h"
@@ -16,7 +16,7 @@
 
 namespace {
 const char* TAG = "udp_server";
-const int UDP_PORT = 8081;
+const int UDP_PORT = 8000;
 const int BUFFER_SIZE = 1024;
 
 // 全局变量
@@ -111,10 +111,23 @@ void udp_server_handle_data(void) {
                 memcpy(packet->data, buffer, bytes_read);
                 packet->length = bytes_read;
 
+                // 保存UDP客户端地址
+                struct sockaddr_in* client_addr_copy = (struct sockaddr_in*)malloc(sizeof(struct sockaddr_in));
+                if (client_addr_copy) {
+                    memcpy(client_addr_copy, &client_addr, sizeof(struct sockaddr_in));
+                    packet->user_data = client_addr_copy;
+                } else {
+                    ESP_LOGE(TAG, "Failed to allocate memory for UDP client address");
+                    packet->user_data = NULL;
+                }
+
                 if (xQueueSend(global_rx_queue, &packet, pdMS_TO_TICKS(100)) !=
                     pdTRUE) {
                     ESP_LOGW(TAG, "Failed to send UDP data to global queue");
                     free(packet->data);
+                    if (packet->user_data) {
+                        free(packet->user_data);
+                    }
                     free(packet);
                 } else {
                     ESP_LOGI(TAG, "UDP data received: bytes=%d", bytes_read);
@@ -134,4 +147,27 @@ void udp_server_handle_data(void) {
 // 设置LwIP初始化状态
 void udp_server_set_lwip_initialized(bool initialized) {
     lwip_initialized = initialized;
+}
+
+// 向UDP客户端发送响应
+esp_err_t udp_server_send_response(int server_fd, const struct sockaddr_in* client_addr, const char* data, size_t len) {
+    if (server_fd < 0 || client_addr == nullptr || data == nullptr || len == 0) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    // 获取LwIP互斥锁
+    std::lock_guard<std::mutex> lock(lwip_mutex);
+
+    int bytes_sent = sendto(server_fd, data, len, 0, 
+                            (const struct sockaddr*)client_addr, sizeof(struct sockaddr_in));
+    if (bytes_sent < 0) {
+        ESP_LOGE(TAG, "Failed to send UDP response: %s", strerror(errno));
+        return ESP_FAIL;
+    }
+
+    if (bytes_sent != static_cast<int>(len)) {
+        ESP_LOGW(TAG, "Partial UDP response sent: %d/%zu bytes", bytes_sent, len);
+    }
+
+    return ESP_OK;
 }

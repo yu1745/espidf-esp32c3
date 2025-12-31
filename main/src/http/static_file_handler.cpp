@@ -1,5 +1,5 @@
 #include "http/static_file_handler.hpp"
-#include <esp_heap_caps.h>
+#include "esp_log.h"
 #include <esp_vfs.h>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -7,26 +7,13 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <memory>
+#include <algorithm>
 
 static const char* TAG = "static_file_handler";
 
-// StaticFileHandler构造函数
-StaticFileHandler::StaticFileHandler() : buffer(nullptr), buffer_size(0) {
-    buffer_size = 8192;
-    buffer = (char*)malloc(buffer_size);
-    if (!buffer) {
-        ESP_LOGE(TAG, "无法分配内存缓冲区");
-    }
-}
-
-// StaticFileHandler析构函数
-StaticFileHandler::~StaticFileHandler() {
-    if (buffer) {
-        heap_caps_free(buffer);
-        buffer = nullptr;
-        ESP_LOGI(TAG, "释放了文件传输缓冲区");
-    }
-}
+// 初始化静态成员变量
+std::atomic<size_t> StaticFileHandler::max_allocated_memory{0};
 
 // StaticFileHandler单例实现
 StaticFileHandler& StaticFileHandler::getInstance() {
@@ -34,15 +21,9 @@ StaticFileHandler& StaticFileHandler::getInstance() {
     return instance;
 }
 
-// 设置静态文件的基础路径
-void StaticFileHandler::setBasePath(const std::string& base_path) {
-    this->base_path = base_path;
-    ESP_LOGI(TAG, "设置静态文件基础路径: %s", base_path.c_str());
-}
-
-// 获取当前设置的基础路径
-const std::string& StaticFileHandler::getBasePath() const {
-    return base_path;
+// 获取同时分配的最大内存
+size_t StaticFileHandler::getMaxAllocatedMemory() {
+    return max_allocated_memory.load(std::memory_order_relaxed);
 }
 
 // 根据文件扩展名获取MIME类型
@@ -107,6 +88,7 @@ const char* StaticFileHandler::getMimeType(const std::string& filename) {
 // URL解码函数
 std::string StaticFileHandler::urlDecode(const std::string& src) {
     std::string decoded;
+    decoded.reserve(src.length());
     for (size_t i = 0; i < src.length(); ++i) {
         if (src[i] == '%' && i + 2 < src.length()) {
             // 解码%XX格式的字符
@@ -141,22 +123,30 @@ esp_err_t StaticFileHandler::handleStaticFile(httpd_req_t* req) {
     // URL解码
     std::string decoded_uri = urlDecode(uri);
 
-    // 构建完整的文件路径
-    std::string file_path;
-    if (base_path.empty()) {
-        file_path = DEFAULT_BASE_PATH + decoded_uri;
-    } else {
-        file_path = base_path + decoded_uri;
-    }
+    // 构建完整的文件路径，固定使用 DEFAULT_BASE_PATH
+    std::string file_path = DEFAULT_BASE_PATH;
 
-    // 如果请求的是目录，尝试添加index.html
     struct stat st;
-    if (stat(file_path.c_str(), &st) == 0 && S_ISDIR(st.st_mode)) {
+
+    // 特殊处理根路径 /
+    if (decoded_uri == "/" || decoded_uri.empty()) {
         if (file_path.back() != '/') {
             file_path += '/';
         }
         file_path += "index.html";
-        ESP_LOGI(TAG, "目录请求，尝试访问: %s", file_path.c_str());
+        ESP_LOGI(TAG, "根路径请求，尝试访问: %s", file_path.c_str());
+    } else {
+        // 处理其他路径
+        file_path += decoded_uri;
+
+        // 如果请求的是目录，尝试添加index.html
+        if (stat(file_path.c_str(), &st) == 0 && S_ISDIR(st.st_mode)) {
+            if (file_path.back() != '/') {
+                file_path += '/';
+            }
+            file_path += "index.html";
+            ESP_LOGI(TAG, "目录请求，尝试访问: %s", file_path.c_str());
+        }
     }
 
     // 检查文件是否存在
@@ -191,6 +181,41 @@ esp_err_t StaticFileHandler::handleStaticFile(httpd_req_t* req) {
         return ESP_OK;
     }
 
+    // 根据文件大小线性调整缓冲区，最大8KB
+    // 小文件使用较小缓冲区，大文件使用8KB缓冲区
+    const size_t MAX_BUFFER_SIZE = 8192;  // 8KB
+    const size_t MIN_BUFFER_SIZE = 512;    // 512B
+    const size_t BUFFER_SCALE_THRESHOLD = 102400;  // 100KB，超过此大小使用最大缓冲区
+    size_t buffer_size;
+
+    if (st.st_size <= BUFFER_SCALE_THRESHOLD) {
+        // 线性调整：512B 到 8KB 之间按比例
+        buffer_size = MIN_BUFFER_SIZE +
+                     (MAX_BUFFER_SIZE - MIN_BUFFER_SIZE) * st.st_size / BUFFER_SCALE_THRESHOLD;
+    } else {
+        // 大文件使用最大缓冲区
+        buffer_size = MAX_BUFFER_SIZE;
+    }
+
+    // 确保至少是MIN_BUFFER_SIZE，最多是MAX_BUFFER_SIZE
+    buffer_size = std::max(MIN_BUFFER_SIZE, std::min(MAX_BUFFER_SIZE, buffer_size));
+
+    ESP_LOGI(TAG, "文件大小: %ld bytes, 使用缓冲区: %zu bytes", st.st_size, buffer_size);
+
+    // 为每个请求分配独立的缓冲区
+    std::unique_ptr<char[]> buffer(new char[buffer_size]);
+
+    // 更新同时分配的最大内存记录（只能上涨不能下跌）
+    size_t expected = max_allocated_memory.load(std::memory_order_relaxed);
+    while (expected < buffer_size) {
+        if (max_allocated_memory.compare_exchange_weak(expected, buffer_size,
+                                                       std::memory_order_relaxed,
+                                                       std::memory_order_relaxed)) {
+            ESP_LOGI(TAG, "更新最大分配内存: %zu bytes", buffer_size);
+            break;
+        }
+    }
+
     // 打开文件
     FILE* file = fopen(file_path.c_str(), "rb");
     if (!file) {
@@ -212,22 +237,29 @@ esp_err_t StaticFileHandler::handleStaticFile(httpd_req_t* req) {
     httpd_resp_set_type(req, getMimeType(file_path));
 
     // 添加缓存控制头
-    httpd_resp_set_hdr(req, "Cache-Control", "public, max-age=3600");
+    // httpd_resp_set_hdr(req, "Cache-Control", "public, max-age=3600");
 
     // 添加跨域头
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
 
-    // 检查缓冲区是否可用
-    if (!buffer || buffer_size == 0) {
-        ESP_LOGE(TAG, "缓冲区不可用");
-        fclose(file);
-        return ESP_ERR_NO_MEM;
+    // 为.js和.css文件添加gzip编码头
+    size_t dot_pos = file_path.find_last_of('.');
+    if (dot_pos != std::string::npos) {
+        std::string extension = file_path.substr(dot_pos + 1);
+        // 转换为小写
+        for (char& c : extension) {
+            c = tolower(c);
+        }
+        if (extension == "js" || extension == "css") {
+            httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
+            ESP_LOGI(TAG, "为%s文件添加gzip编码头", extension.c_str());
+        }
     }
 
-    // 分块读取并发送文件内容
+    // 分块读取并发送文件内容（使用本地独立的缓冲区）
     size_t bytes_read;
-    while ((bytes_read = fread(buffer, 1, buffer_size, file)) > 0) {
-        esp_err_t ret = httpd_resp_send_chunk(req, buffer, bytes_read);
+    while ((bytes_read = fread(buffer.get(), 1, buffer_size, file)) > 0) {
+        esp_err_t ret = httpd_resp_send_chunk(req, buffer.get(), bytes_read);
         if (ret != ESP_OK) {
             ESP_LOGE(TAG, "发送文件块失败: %s", esp_err_to_name(ret));
             fclose(file);

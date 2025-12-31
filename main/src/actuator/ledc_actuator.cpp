@@ -9,8 +9,10 @@ namespace actuator {
 
 LEDCActuator::LEDCActuator(int gpio_num,
                            ledc_channel_t channel,
-                           uint32_t freq_hz)
-    : m_gpio_num(gpio_num), m_channel(channel), m_freq_hz(freq_hz) {
+                           ledc_timer_t timer,
+                           uint32_t freq_hz,
+                           float offset)
+    : Actuator(offset), m_gpio_num(gpio_num), m_channel(channel), m_timer(timer), m_freq_hz(freq_hz) {
     if (freq_hz < 50 || freq_hz > 333) {
         ESP_LOGE(TAG, "Invalid frequency %dHz, must be between 50Hz and 333Hz",
                  freq_hz);
@@ -73,13 +75,16 @@ bool LEDCActuator::initLEDC() {
 }
 
 void LEDCActuator::setTarget(float target) {
+    // 自动加上offset
+    float target_with_offset = target + m_offset;
+    
     // 限制目标值在[-1, 1]范围内
-    if (target < -1.0f) {
+    if (target_with_offset < -1.0f) {
         m_target = -1.0f;
-    } else if (target > 1.0f) {
+    } else if (target_with_offset > 1.0f) {
         m_target = 1.0f;
     } else {
-        m_target = target;
+        m_target = target_with_offset;
     }
 
     // 调用具体的执行实现，不等待

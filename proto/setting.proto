@@ -1,0 +1,136 @@
+syntax = "proto2";
+
+import "nanopb.proto";
+
+message Setting {
+    message Wifi{
+        optional string ssid = 1 [(nanopb).max_length = 64];
+        optional string password = 2 [(nanopb).max_length = 64];
+        optional int32 static_ip = 3;
+        optional int32 gateway = 4;
+        optional int32 dns = 5;
+        optional bool enable_soft_ap = 6;
+        optional string soft_ap_ssid = 7 [(nanopb).max_length = 64];
+        optional string soft_ap_password = 8 [(nanopb).max_length = 64];
+        optional int32 soft_ap_ip = 9;
+        optional int32 tcp_port = 10;  // TCP端口号
+        optional int32 udp_port = 11;  // UDP端口号
+    }
+    optional Wifi wifi = 1;
+    message Servo{
+        optional int32 A_SERVO_PIN = 1;
+        optional int32 B_SERVO_PIN = 2;
+        optional int32 C_SERVO_PIN = 3;
+        optional int32 D_SERVO_PIN = 4;
+        optional int32 E_SERVO_PIN = 26;
+        optional int32 F_SERVO_PIN = 27;
+        optional int32 G_SERVO_PIN = 44;
+        optional int32 A_SERVO_PWM_FREQ = 5;
+        optional int32 B_SERVO_PWM_FREQ = 6;
+        optional int32 C_SERVO_PWM_FREQ = 7;
+        optional int32 D_SERVO_PWM_FREQ = 8;
+        optional int32 E_SERVO_PWM_FREQ = 28;
+        optional int32 F_SERVO_PWM_FREQ = 29;
+        optional int32 G_SERVO_PWM_FREQ = 45;
+        optional int32 A_SERVO_ZERO = 9;
+        optional int32 B_SERVO_ZERO = 10;
+        optional int32 C_SERVO_ZERO = 11;
+        optional int32 D_SERVO_ZERO = 12;
+        optional int32 E_SERVO_ZERO = 30;
+        optional int32 F_SERVO_ZERO = 31;
+        optional int32 G_SERVO_ZERO = 46;
+        optional float L0_SCALE = 13;
+        optional float L1_SCALE = 32;
+        optional float L2_SCALE = 34;
+        optional float R0_SCALE = 33;
+        optional float R1_SCALE = 14;
+        optional float R2_SCALE = 15;
+        optional float L0_LEFT = 16;
+        optional float L0_RIGHT = 17;
+        optional float L1_LEFT = 35;
+        optional float L1_RIGHT = 36;
+        optional float L2_LEFT = 39;
+        optional float L2_RIGHT = 40;
+        optional float R0_LEFT = 37;
+        optional float R0_RIGHT = 38;
+        optional float R1_LEFT = 18;
+        optional float R1_RIGHT = 19;
+        optional float R2_LEFT = 20;
+        optional float R2_RIGHT = 21;
+        optional bool L0_REVERSE = 23; 
+        optional bool L1_REVERSE = 41;
+        optional bool L2_REVERSE = 43;
+        optional bool R0_REVERSE = 42;
+        optional bool R1_REVERSE = 24;
+        optional bool R2_REVERSE = 25;
+        optional float MODE = 22;
+    }
+    optional Servo servo = 2;
+    message Temperature{
+        optional int64 deviceAddress1 = 1;
+        optional int64 deviceAddress2 = 2;
+        optional int64 deviceAddress3 = 3;
+    }
+    //deprecated
+    optional Temperature temp = 3;
+    message mDNS{
+        optional string name = 1 [(nanopb).max_length = 64];
+    }
+    optional mDNS mdns = 4;
+    message LED{
+        optional bool enable = 1; //是否开启led
+    }
+    optional LED led = 5;
+    message Decoy{
+        optional int32 ADC_PIN = 1;
+        optional int32 MOD1_PIN = 2;
+        optional int32 MOD2_PIN = 3;
+        optional int32 MOD3_PIN = 4;
+    }
+    optional Decoy decoy = 6;
+    message ZDT{
+        optional float Kp = 1;
+        optional float Ki = 2;
+        optional float Kd = 3;
+        optional float IMax = 4;
+        optional bool useAutoHome = 5; //是否自动回零，不开需要用户自己确保上电时滑块已经在最低点
+        message HomeParam{
+            optional int32 home_speed = 1; //回零速度
+            optional int32 home_timeout = 2; //回零超时时间
+            optional int32 home_collide_speed = 3; // 堵转速度阈值
+            optional int32 home_collide_current = 4; // 堵转电流阈值
+            optional int32 home_collide_time = 5;    // 堵转时间阈值
+            optional int32 home_wait_time = 6;// 单位是s
+        }
+        optional HomeParam home_param = 6;
+        optional bool enableDebug = 7;
+    }
+    optional ZDT zdt = 7;
+    message MIT{
+        optional float Kp_a = 1;
+        optional float Ki_a = 2;
+        optional float Kd_a = 3;
+        optional float offset_a = 4; //角度，不是弧度
+        optional float Kp_b = 5;
+        optional float Ki_b = 6;
+        optional float Kd_b = 7;
+        optional float offset_b = 8; //角度，不是弧度
+        optional float Kp_c = 9;
+        optional float Ki_c = 10;
+        optional float Kd_c = 11;
+        optional float offset_c = 12; //角度，不是弧度
+        optional float Kp_d = 13;
+        optional float Ki_d = 14;
+        optional float Kd_d = 15;
+        optional float offset_d = 16; //角度，不是弧度
+        optional float Kp_e = 17;
+        optional float Ki_e = 18;
+        optional float Kd_e = 19;
+        optional float offset_e = 20; //角度，不是弧度
+        optional float Kp_f = 21;
+        optional float Ki_f = 22;
+        optional float Kd_f = 23;
+        optional float offset_f = 24; //角度，不是弧度
+    }
+    optional MIT mit = 8;
+}

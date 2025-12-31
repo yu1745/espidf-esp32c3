@@ -14,7 +14,10 @@ extern "C" {
 typedef enum {
     DATA_SOURCE_UART = 0,
     DATA_SOURCE_TCP = 1,
-    DATA_SOURCE_UDP = 2
+    DATA_SOURCE_UDP = 2,
+    DATA_SOURCE_WEBSOCKET = 3,
+    DATA_SOURCE_BLE = 4,
+    DATA_SOURCE_HANDY = 5,
 } data_source_t;
 
 typedef struct {
@@ -22,6 +25,7 @@ typedef struct {
     int client_fd;  // 对于TCP/UDP，客户端socket文件描述符；对于UART，为-1
     uint8_t* data;
     size_t length;
+    void* user_data;  // 额外数据，对于UDP存储客户端地址(sockaddr_in*)，其他为NULL
 } data_packet_t;
 
 // 初始化select线程

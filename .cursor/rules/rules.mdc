@@ -6,11 +6,11 @@ alwaysApply: true
 使用ESP_LOGx而非std::cout来输出信息
 在使用命令时，记住运行环境是powershell，不是cmd也不是bash
 记住我在使用esp-idf版本v5.5.1,芯片是esp32c3
-优先使用std api而不是freertos api,比如malloc和pvPortMalloc
+优先使用智能指针分配内存
 在使用锁时，使用std::mutex和lock_guard，而不是使用freertos的mutex和xSemaphoreTake/xSemaphoreGive
 <!-- 在使用命令时，如果要使用python，先执行conda activate base -->
 在多次修改后仍然报错时，使用context7 mcp来获取最新的代码
 使用context7获取espidf的文档时，id是"/websites/espressif_projects_esp-idf_en_stable_esp32c3"
-对于构造函数，使用try-catch包装，报错时，ESP_LOGE之后，清理已经分配的资源，然后将捕获的异常再次向上抛出
+对于类的构造函数，使用try-catch包装，报错时，ESP_LOGE之后，清理已经分配的资源，然后将捕获的异常再次向上抛出
 使用项目根目录的idf.py.ps1
-对于新建的文件，出现ESP_LOGX之类的宏定义报错，忽略即可，这是ide的bug，不是真的报错，只要重新执行./idf.py.ps1 reconfigure再等几秒就能消除
+所有的http端点函数,ble端点函数都不要使用栈分配，而是使用智能指针分配并自动释放

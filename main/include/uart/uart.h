@@ -1,13 +1,18 @@
 #pragma once
 
+#include "esp_err.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-void uart_init(void);
+esp_err_t uart_init(void);
 
 // 处理UART数据读取和echo
 void uart_handle_data(void);
+
+// 通过UART发送数据
+esp_err_t uart_send_response(const char* data, size_t len);
 
 #ifdef __cplusplus
 }

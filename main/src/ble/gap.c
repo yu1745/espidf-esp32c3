@@ -7,6 +7,9 @@
 #include "ble/gap.h"
 #include "ble/common.h"
 #include "ble/gatt_svc.h"
+#include "ble/ble_router_c.h"
+#include <string.h>
+#include "host/ble_uuid.h"
 
 const static char* TAG = "GAP";
 
@@ -104,18 +107,71 @@ static void start_advertising(void) {
         return;
     }
 
-    /* Set device address */
+    /* Set service UUIDs from BleRouter in scan response */
+    const ble_uuid_t** service_uuids = NULL;
+    size_t service_count = 0;
+    if (ble_router_get_service_uuids(&service_uuids, &service_count) == 0 &&
+        service_uuids != NULL && service_count > 0) {
+        /* 分离16位和128位UUID */
+        static ble_uuid16_t uuids16[8];
+        static ble_uuid128_t uuids128[8];
+        size_t count_16 = 0;
+        size_t count_128 = 0;
+
+        for (size_t i = 0; i < service_count && (count_16 < 8 || count_128 < 8); i++) {
+            if (service_uuids[i] == NULL) {
+                continue;
+            }
+            if (service_uuids[i]->type == BLE_UUID_TYPE_16) {
+                if (count_16 < 8) {
+                    uuids16[count_16].u.type = BLE_UUID_TYPE_16;
+                    uuids16[count_16].value = BLE_UUID16(service_uuids[i])->value;
+                    count_16++;
+                }
+            } else if (service_uuids[i]->type == BLE_UUID_TYPE_128) {
+                if (count_128 < 8) {
+                    memcpy(&uuids128[count_128], BLE_UUID128(service_uuids[i]),
+                           sizeof(ble_uuid128_t));
+                    count_128++;
+                }
+            }
+        }
+
+        /* 设置16位UUID到扫描响应 */
+        if (count_16 > 0) {
+            rsp_fields.uuids16 = uuids16;
+            rsp_fields.num_uuids16 = count_16;
+            rsp_fields.uuids16_is_complete = 1;
+        }
+
+        /* 设置128位UUID到扫描响应 - 限制为1个以避免数据包过大 */
+        /* 一个128位UUID需要17字节（1字节类型+16字节UUID），加上设备地址等可能超过31字节限制 */
+        if (count_128 > 0) {
+            rsp_fields.uuids128 = uuids128;
+            rsp_fields.num_uuids128 = 1;  /* 限制为1个以避免超出31字节限制 */
+            rsp_fields.uuids128_is_complete = (count_128 == 1) ? 1 : 0;  /* 如果只有1个则标记为完整 */
+            if (count_128 > 1) {
+                ESP_LOGW(TAG, "警告: 有 %zu 个128位UUID，但只添加了第一个以避免数据包过大", count_128);
+            }
+        }
+
+        ESP_LOGI(TAG, "添加了 %zu 个服务UUID到扫描响应数据 (16位: %zu, 128位: %zu)",
+                 service_count, count_16, count_128);
+    }
+
+    /* Set device address (在UUID之后设置，避免数据包过大) */
     rsp_fields.device_addr = addr_val;
     rsp_fields.device_addr_type = own_addr_type;
     rsp_fields.device_addr_is_present = 1;
 
+    /* 注释掉URI和adv_itvl以节省空间给UUID */
     /* Set URI */
-    rsp_fields.uri = esp_uri;
-    rsp_fields.uri_len = sizeof(esp_uri);
+    /* rsp_fields.uri = esp_uri; */
+    /* rsp_fields.uri_len = sizeof(esp_uri); */
 
     /* Set advertising interval */
-    rsp_fields.adv_itvl = BLE_GAP_ADV_ITVL_MS(500);
-    rsp_fields.adv_itvl_is_present = 1;
+    /* rsp_fields.adv_itvl = BLE_GAP_ADV_ITVL_MS(500); */
+    /* rsp_fields.adv_itvl_is_present = 1; */
 
     /* Set scan response fields */
     rc = ble_gap_adv_rsp_set_fields(&rsp_fields);
@@ -129,8 +185,8 @@ static void start_advertising(void) {
     adv_params.disc_mode = BLE_GAP_DISC_MODE_GEN;
 
     /* Set advertising interval */
-    adv_params.itvl_min = BLE_GAP_ADV_ITVL_MS(500);
-    adv_params.itvl_max = BLE_GAP_ADV_ITVL_MS(510);
+    adv_params.itvl_min = BLE_GAP_ADV_ITVL_MS(100);
+    adv_params.itvl_max = BLE_GAP_ADV_ITVL_MS(110);
 
     /* Start advertising */
     rc = ble_gap_adv_start(own_addr_type, NULL, BLE_HS_FOREVER, &adv_params,
@@ -179,10 +235,15 @@ static int gap_event_handler(struct ble_gap_event* event, void* arg) {
 
                 /* Try to update connection parameters */
                 struct ble_gap_upd_params params = {
-                    .itvl_min = desc.conn_itvl,
-                    .itvl_max = desc.conn_itvl,
-                    .latency = 3,
-                    .supervision_timeout = desc.supervision_timeout};
+                    // .itvl_min = desc.conn_itvl,
+                    // .itvl_max = desc.conn_itvl,
+                    .itvl_min = BLE_GAP_ADV_ITVL_MS(10),
+                    .itvl_max = BLE_GAP_ADV_ITVL_MS(10),
+                    // .latency = 3,
+                    .latency = 0,
+                    // .supervision_timeout = desc.supervision_timeout
+                    .supervision_timeout = BLE_GAP_SUPERVISION_TIMEOUT_MS(100)
+                };
                 rc = ble_gap_update_params(event->connect.conn_handle, &params);
                 if (rc != 0) {
                     ESP_LOGE(TAG,

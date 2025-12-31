@@ -1,7 +1,6 @@
 #include "spiffs.h"
 #include "esp_log.h"
 #include "esp_spiffs.h"
-#include "esp_vfs.h"
 
 namespace {
 const char* TAG = "spiffs";

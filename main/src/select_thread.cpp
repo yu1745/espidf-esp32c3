@@ -7,7 +7,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/task.h"
-#include "globals.h"
+#include "globals.hpp"
 #include "tcp_server.hpp"
 #include "udp_server.hpp"
 #include "uart/uart.h"

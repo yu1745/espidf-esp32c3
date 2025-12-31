@@ -2,7 +2,6 @@
 
 #include <mutex>
 #include "actuator/actuator.hpp"
-#include "driver/rmt_encoder.h"
 #include "driver/rmt_tx.h"
 
 namespace actuator {
@@ -18,10 +17,9 @@ class RMTActuator : public Actuator {
     /**
      * @brief 构造函数
      * @param gpio_num 输出GPIO引脚号
-     * @param channel RMT通道号
-     * @param tick_us rmt一个tick对应时间，单位微秒
+     * @param offset 偏移量，默认为0.0f
      */
-    RMTActuator(int gpio_num, uint32_t tick_us = 1);
+    RMTActuator(int gpio_num, float offset = 0.0f);
 
     /**
      * @brief 析构函数
@@ -41,7 +39,6 @@ class RMTActuator : public Actuator {
     int m_channel;                      // RMT通道号
     rmt_channel_handle_t m_tx_channel;  // RMT通道句柄
     rmt_encoder_handle_t m_encoder;     // RMT编码器句柄
-    uint32_t m_tick_us;                 // RMT一个tick对应时间，单位微秒
     rmt_transmit_config_t m_tx_config;  // 传输配置
     std::mutex m_mutex;                 // 互斥锁
     bool m_initialized = false;         // 初始化标志
@@ -74,9 +71,7 @@ class RMTActuator : public Actuator {
 /**
  * @brief RMT执行器测试函数
  * @param gpio_num 测试使用的GPIO引脚号
- * @param channel RMT通道号
- * @param tick_us RMT一个tick对应时间，单位微秒
  */
-static void testRMTActuator(int gpio_num, uint32_t channel, uint32_t tick_us);
+void testRMTActuator(int gpio_num);
 
 }  // namespace actuator

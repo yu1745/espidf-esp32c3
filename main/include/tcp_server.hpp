@@ -35,6 +35,9 @@ const int* tcp_server_get_client_fds(void);
 // 设置LwIP初始化状态
 void tcp_server_set_lwip_initialized(bool initialized);
 
+// 向TCP客户端发送响应
+esp_err_t tcp_server_send_response(int client_fd, const char* data, size_t len);
+
 #ifdef __cplusplus
 }
 #endif

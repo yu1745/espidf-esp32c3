@@ -11,7 +11,7 @@ FILE(GLOB_RECURSE app_sources
 
 idf_component_register(SRCS "${app_sources}"
     PRIV_REQUIRES bt nvs_flash esp_http_server esp_wifi esp_netif esp_event
-    esp_driver_uart esp_driver_usb_serial_jtag driver esp_driver_rmt esp_driver_ledc lwip nanopb spiffs
+    esp_driver_uart esp_driver_usb_serial_jtag driver esp_driver_rmt esp_driver_ledc esp_driver_spi lwip nanopb spiffs esp_adc esp_driver_twai
     INCLUDE_DIRS "./include"
 )
 

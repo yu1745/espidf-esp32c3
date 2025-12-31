@@ -20,16 +20,22 @@ class LEDCActuator : public Actuator {
      * @param channel LEDC通道号
      * @param timer LEDC定时器号
      * @param freq_hz PWM频率，默认50Hz
+     * @param offset 偏移量，默认为0.0f
      */
-    LEDCActuator(int gpio_num, ledc_channel_t channel, uint32_t freq_hz = 50);
+    LEDCActuator(int gpio_num, ledc_channel_t channel, ledc_timer_t timer, uint32_t freq_hz = 50, float offset = 0.0f);
 
     /**
      * @brief 析构函数
      */
     virtual ~LEDCActuator();
 
-   protected:
+    /**
+     * @brief 设置执行器目标值
+     * @param target 目标值，范围[-1, 1]
+     */
     void setTarget(float target) override;
+
+   protected:
     /**
      * @brief 执行器输出实现
      * @param wait 等待时间，单位ms，0表示不等待
@@ -40,7 +46,7 @@ class LEDCActuator : public Actuator {
    private:
     int m_gpio_num;                                          // GPIO引脚号
     ledc_channel_t m_channel;                                // LEDC通道
-    ledc_timer_t m_timer = LEDC_TIMER_0;                     // LEDC定时器
+    ledc_timer_t m_timer;                                    // LEDC定时器
     uint32_t m_freq_hz;                                      // PWM频率
     ledc_timer_bit_t m_duty_resolution = LEDC_TIMER_14_BIT;  // PWM分辨率(14位)
     std::mutex m_mutex;                                      // 互斥锁

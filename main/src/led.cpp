@@ -12,7 +12,7 @@ const char* TAG = "led";
 // LED配置
 #define LED_STRIP_GPIO_PIN 5                         // LED灯带连接的GPIO引脚
 #define LED_STRIP_LED_COUNT 1                        // LED灯带中LED的数量
-#define LED_STRIP_RMT_RES_HZ 0 * (10 * 1000 * 1000)  // RMT分辨率，10MHz
+#define LED_STRIP_RMT_RES_HZ 1 * (10 * 1000 * 1000)  // RMT分辨率，10MHz
 
 // LED灯带句柄
 static led_strip_handle_t g_led_strip = nullptr;
@@ -37,23 +37,31 @@ esp_err_t led_init(void) {
         }};
 
     // LED灯带后端配置：RMT
-    led_strip_rmt_config_t rmt_config = {
-        .clk_src = RMT_CLK_SRC_DEFAULT,         // 时钟源
-        .resolution_hz = LED_STRIP_RMT_RES_HZ,  // RMT计数器时钟频率
-        .mem_block_symbols = 48,
+    // led_strip_rmt_config_t rmt_config = {
+    //     .clk_src = RMT_CLK_SRC_DEFAULT,         // 时钟源
+    //     .resolution_hz = LED_STRIP_RMT_RES_HZ,  // RMT计数器时钟频率
+    //     .mem_block_symbols = 48,
+    //     .flags = {
+    //         .with_dma = false,  // 不使用DMA
+    //     }};
+
+    led_strip_spi_config_t spi_config = {
+        .clk_src = SPI_CLK_SRC_DEFAULT, // different clock source can lead to different power consumption
+        .spi_bus = SPI2_HOST,           // SPI bus ID
         .flags = {
-            .with_dma = false,  // 不使用DMA
-        }};
+            .with_dma = false, // Using DMA can improve performance and help drive more LEDs
+        }
+    };
 
     // 创建LED灯带对象
     esp_err_t ret =
-        led_strip_new_rmt_device(&strip_config, &rmt_config, &g_led_strip);
+        led_strip_new_spi_device(&strip_config, &spi_config, &g_led_strip);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to create LED strip: %s", esp_err_to_name(ret));
         return ret;
     }
 
-    // 清除LED灯带（关闭所有LED）
+    // // 清除LED灯带（关闭所有LED）
     // ret = led_strip_clear(g_led_strip);
     // if (ret != ESP_OK) {
     //     ESP_LOGE(TAG, "Failed to clear LED strip: %s", esp_err_to_name(ret));
@@ -164,7 +172,7 @@ esp_err_t led_color_test(uint32_t test_duration) {
 
     // 定义要测试的颜色数组
     led_color_t test_colors[] = {
-        LED_COLOR_RED,    LED_COLOR_GREEN,   LED_COLOR_BLUE,  LED_COLOR_YELLOW,
+        LED_COLOR_GREEN,    LED_COLOR_RED,   LED_COLOR_BLUE,  LED_COLOR_YELLOW,
         LED_COLOR_CYAN,   LED_COLOR_MAGENTA, LED_COLOR_WHITE, LED_COLOR_ORANGE,
         LED_COLOR_PURPLE, LED_COLOR_PINK};
 

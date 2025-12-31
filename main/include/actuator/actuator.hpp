@@ -15,10 +15,11 @@ class Actuator {
    public:
     /**
      * @brief 构造函数
+     * @param offset 偏移量，默认为0.0f
      * @throws std::exception
      * 某些派生类的构造函数可能会抛出异常,在外设初始化失败时
      */
-    Actuator() = default;
+    Actuator(float offset = 0.0f) : m_offset(offset) {}
 
     /**
      * @brief 虚析构函数
@@ -43,6 +44,11 @@ class Actuator {
      * @brief 目标值
      */
     float m_target;
+
+    /**
+     * @brief 偏移量
+     */
+    float m_offset;
 
     /**
      * @brief 执行器输出实现（纯虚函数）

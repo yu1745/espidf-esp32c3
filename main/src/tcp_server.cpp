@@ -8,7 +8,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/task.h"
-#include "globals.h"
+#include "globals.hpp"
 #include "lwip/netdb.h"
 #include "lwip/sockets.h"
 #include "lwip/sys.h"
@@ -16,7 +16,7 @@
 
 namespace {
 const char* TAG = "tcp_server";
-const int TCP_PORT = 8080;
+const int TCP_PORT = 8000;
 const int BUFFER_SIZE = 1024;
 const int MAX_CLIENTS = 5;
 
@@ -173,6 +173,7 @@ void tcp_server_handle_client_data(int client_fd) {
     if (packet) {
         packet->source = DATA_SOURCE_TCP;
         packet->client_fd = client_fd;
+        packet->user_data = NULL;  // TCP不需要user_data
         packet->data = (uint8_t*)malloc(bytes_read);
         if (packet->data) {
             memcpy(packet->data, buffer, bytes_read);
@@ -230,4 +231,26 @@ const int* tcp_server_get_client_fds(void) {
 // 设置LwIP初始化状态
 void tcp_server_set_lwip_initialized(bool initialized) {
     lwip_initialized = initialized;
+}
+
+// 向TCP客户端发送响应
+esp_err_t tcp_server_send_response(int client_fd, const char* data, size_t len) {
+    if (client_fd < 0 || data == nullptr || len == 0) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    // 获取LwIP互斥锁
+    std::lock_guard<std::mutex> lock(lwip_mutex);
+
+    int bytes_sent = send(client_fd, data, len, 0);
+    if (bytes_sent < 0) {
+        ESP_LOGE(TAG, "Failed to send TCP response: %s", strerror(errno));
+        return ESP_FAIL;
+    }
+
+    if (bytes_sent != static_cast<int>(len)) {
+        ESP_LOGW(TAG, "Partial TCP response sent: %d/%zu bytes", bytes_sent, len);
+    }
+
+    return ESP_OK;
 }

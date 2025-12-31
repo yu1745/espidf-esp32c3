@@ -1,7 +1,5 @@
 # Build outputs
 build/
-sdkconfig
-sdkconfig.old
 
 # Dependencies
 managed_components/

@@ -1,10 +1,9 @@
 #pragma once
 
 #include <string>
+#include <atomic>
 #include "esp_err.h"
 #include "esp_http_server.h"
-#include "esp_log.h"
-#include "spiffs.h"
 
 #ifdef __cplusplus
 
@@ -12,7 +11,7 @@
  * @brief 静态文件HTTP处理器类
  *
  * 该类提供从SPIFFS文件系统提供静态文件的功能
- * 支持8K缓冲区，自动MIME类型检测
+ * 使用每个请求独立的缓冲区，自动MIME类型检测，线程安全
  */
 class StaticFileHandler {
    public:
@@ -25,20 +24,6 @@ class StaticFileHandler {
      * @return StaticFileHandler& 单例引用
      */
     static StaticFileHandler& getInstance();
-
-    /**
-     * @brief 设置静态文件的基础路径
-     *
-     * @param base_path 基础路径，默认为"/spiffs"
-     */
-    void setBasePath(const std::string& base_path);
-
-    /**
-     * @brief 获取当前设置的基础路径
-     *
-     * @return const std::string& 基础路径
-     */
-    const std::string& getBasePath() const;
 
     /**
      * @brief 静态文件HTTP处理器函数
@@ -54,7 +39,7 @@ class StaticFileHandler {
      * @param filename 文件名
      * @return const char* MIME类型字符串
      */
-    const char* getMimeType(const std::string& filename);
+    static const char* getMimeType(const std::string& filename);
 
     /**
      * @brief URL解码函数
@@ -62,17 +47,23 @@ class StaticFileHandler {
      * @param src 源字符串
      * @return std::string 解码后的字符串
      */
-    std::string urlDecode(const std::string& src);
+    static std::string urlDecode(const std::string& src);
+
+    /**
+     * @brief 获取同时分配的最大内存（字节数）
+     *
+     * @return size_t 最大分配内存
+     */
+    static size_t getMaxAllocatedMemory();
 
    private:
-    StaticFileHandler();
-    ~StaticFileHandler();
+    StaticFileHandler() = default;
+    ~StaticFileHandler() = default;
     StaticFileHandler(const StaticFileHandler&) = delete;
     StaticFileHandler& operator=(const StaticFileHandler&) = delete;
 
-    std::string base_path;
-    char* buffer;          // 动态分配的缓冲区
-    size_t buffer_size;    // 缓冲区大小
+    // 记录同时分配的最大内存（只能上涨不能下跌）
+    static std::atomic<size_t> max_allocated_memory;
 };
 
 /**

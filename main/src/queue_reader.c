@@ -3,7 +3,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/task.h"
-#include "globals.h"
+#include "globals.hpp"
 #include "select_thread.hpp"
 
 static const char* TAG = "queue_reader";
@@ -26,6 +26,10 @@ static void queue_reader_task(void* arg) {
             if (packet != NULL) {
                 if (packet->data != NULL) {
                     free(packet->data);
+                }
+                // 释放UDP客户端地址（如果存在）
+                if (packet->user_data != NULL) {
+                    free(packet->user_data);
                 }
                 free(packet);
 

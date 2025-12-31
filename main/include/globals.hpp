@@ -6,8 +6,10 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "esp_timer.h"
-
 #ifdef __cplusplus
+#include "executor/executor.hpp"
+#include <memory>
+
 extern "C" {
 #endif
 
@@ -27,5 +29,8 @@ extern QueueHandle_t uart_tx_queue;
 extern QueueHandle_t global_rx_queue;
 
 #ifdef __cplusplus
+
+extern std::unique_ptr<Executor> g_executor;
+
 }
 #endif
