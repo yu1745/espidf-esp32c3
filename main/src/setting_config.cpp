@@ -340,12 +340,12 @@ Setting_Servo getSR6SHALIConfig_C3() {
 
     // 引脚配置
     config.A_SERVO_PIN = 0;
-    config.B_SERVO_PIN = 1;
-    config.C_SERVO_PIN = 2;
-    config.D_SERVO_PIN = 3;
-    config.E_SERVO_PIN = 5;
-    config.F_SERVO_PIN = 6;
-    config.G_SERVO_PIN = 7;
+    config.B_SERVO_PIN = 2;
+    config.C_SERVO_PIN = 6;
+    config.D_SERVO_PIN = 10;
+    config.E_SERVO_PIN = 3;
+    config.F_SERVO_PIN = 1;
+    config.G_SERVO_PIN = 5;
 
     // PWM频率配置
     config.A_SERVO_PWM_FREQ = 150;
@@ -464,6 +464,72 @@ Setting_Servo getSR6CANConfig_C3() {
     // 模式配置 (SR6CAN mode = 8)
     config.MODE = 8.0f;
 
+    return config;
+}
+
+Setting_Servo getO6Config_C3() {
+    Setting_Servo config = Setting_Servo_init_default;
+    
+    // 引脚配置
+    config.A_SERVO_PIN = 0;
+    config.B_SERVO_PIN = 1;
+    config.C_SERVO_PIN = 2;
+    config.D_SERVO_PIN = 3;
+    config.E_SERVO_PIN = 8;
+    config.F_SERVO_PIN = 10;
+    config.G_SERVO_PIN = 9;
+    
+    // PWM频率配置
+    config.A_SERVO_PWM_FREQ = 50;
+    config.B_SERVO_PWM_FREQ = 50;
+    config.C_SERVO_PWM_FREQ = 50;
+    config.D_SERVO_PWM_FREQ = 50;
+    config.E_SERVO_PWM_FREQ = 50;
+    config.F_SERVO_PWM_FREQ = 50;
+    config.G_SERVO_PWM_FREQ = 50;
+    
+    // 零点配置
+    config.A_SERVO_ZERO = 1500;
+    config.B_SERVO_ZERO = 1500;
+    config.C_SERVO_ZERO = 1500;
+    config.D_SERVO_ZERO = 1500;
+    config.E_SERVO_ZERO = 1500;
+    config.F_SERVO_ZERO = 1500;
+    config.G_SERVO_ZERO = 1500;
+    
+    // 缩放比例配置
+    config.L0_SCALE = 1.0f;
+    config.L1_SCALE = 1.0f;
+    config.L2_SCALE = 1.0f;
+    config.R0_SCALE = 1.0f;
+    config.R1_SCALE = 1.0f;
+    config.R2_SCALE = 1.0f;
+    
+    // 左右限制配置
+    config.L0_LEFT = 0.0f;
+    config.L0_RIGHT = 1.0f;
+    config.L1_LEFT = 0.0f;
+    config.L1_RIGHT = 1.0f;
+    config.L2_LEFT = 0.0f;
+    config.L2_RIGHT = 1.0f;
+    config.R0_LEFT = 0.0f;
+    config.R0_RIGHT = 1.0f;
+    config.R1_LEFT = 0.0f;
+    config.R1_RIGHT = 1.0f;
+    config.R2_LEFT = 0.0f;
+    config.R2_RIGHT = 1.0f;
+    
+    // 反转标志配置
+    config.L0_REVERSE = false;
+    config.L1_REVERSE = false;
+    config.L2_REVERSE = false;
+    config.R0_REVERSE = false;
+    config.R1_REVERSE = false;
+    config.R2_REVERSE = false;
+    
+    // 模式配置
+    config.MODE = 9;
+    
     return config;
 }
 
@@ -822,6 +888,9 @@ Setting_Servo getDefaultServoConfig() {
 #elif defined(CONFIG_SERVO_MODE_SR6CAN)
     ESP_LOGI(TAG, "Using SR6CAN config for ESP32-C3");
     return getSR6CANConfig_C3();
+#elif defined(CONFIG_SERVO_MODE_O6)
+    ESP_LOGI(TAG, "Using O6 config for ESP32-C3");
+    return getO6Config_C3();
 #else  // OSR (默认)
     ESP_LOGI(TAG, "Using OSR config for ESP32-C3 (default)");
     return getOSRConfig_C3();
@@ -842,6 +911,9 @@ Setting_Servo getDefaultServoConfig() {
 #elif defined(CONFIG_SERVO_MODE_SR6_PULSE)
     ESP_LOGI(TAG, "Using SR6_PULSE config for ESP32");
     return getSR6PulseConfig_ESP32();
+#elif defined(CONFIG_SERVO_MODE_O6)
+    ESP_LOGI(TAG, "Using O6 config for ESP32");
+    return getO6Config_ESP32();
 #else  // 默认情况
     ESP_LOGI(TAG, "Using OSR config for ESP32 (default)");
     return getOSRConfig_ESP32();

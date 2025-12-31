@@ -31,6 +31,32 @@ typedef struct {
     int64_t timestamp;  // 时间戳（微秒）
 } executor_event_data_t;
 
+// 声明动作统计事件基
+ESP_EVENT_DECLARE_BASE(MOTION_EVENT);
+
+// 动作统计事件ID
+typedef enum {
+    MOTION_EVENT_STATS = 0,  // 统计数据
+} motion_event_id_t;
+
+// 动作统计数据结构
+typedef struct {
+    // Compute统计
+    float compute_avg_ms;      // 平均耗时（毫秒）
+    float compute_stddev_ms;   // 标准差（毫秒）
+    float compute_max_ms;      // 最大耗时（毫秒）
+    float compute_freq;        // 执行频率（Hz）
+
+    // Execute统计
+    float execute_avg_ms;      // 平均耗时（毫秒）
+    float execute_stddev_ms;   // 标准差（毫秒）
+    float execute_max_ms;      // 最大耗时（毫秒）
+    float execute_freq;        // 执行频率（Hz）
+
+    // 窗口信息
+    float window_seconds;      // 统计窗口时长（秒）
+} motion_stats_event_data_t;
+
 /**
  * @brief Executor抽象类
  * 用于处理TCode字符串的抽象执行器

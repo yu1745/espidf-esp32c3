@@ -170,6 +170,13 @@ public:
    */
   void printServoSetting() const;
 
+  /**
+   * @brief 检查 WiFi 配置是否与另一个 Setting 不同
+   * @param other 要比较的另一个 SettingWrapper
+   * @return true 如果 WiFi 配置有变化，false 如果相同
+   */
+  bool isWifiConfigChanged(const SettingWrapper &other) const;
+
 private:
   std::unique_ptr<Setting> m_setting;
   static const char *TAG;

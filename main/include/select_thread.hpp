@@ -13,11 +13,12 @@ extern "C" {
 // 数据包结构，用于标识数据来源
 typedef enum {
     DATA_SOURCE_UART = 0,
-    DATA_SOURCE_TCP = 1,
-    DATA_SOURCE_UDP = 2,
-    DATA_SOURCE_WEBSOCKET = 3,
-    DATA_SOURCE_BLE = 4,
-    DATA_SOURCE_HANDY = 5,
+    DATA_SOURCE_UART2 = 1,
+    DATA_SOURCE_TCP = 2,
+    DATA_SOURCE_UDP = 3,
+    DATA_SOURCE_WEBSOCKET = 4,
+    DATA_SOURCE_BLE = 5,
+    DATA_SOURCE_HANDY = 6,
 } data_source_t;
 
 typedef struct {
@@ -40,6 +41,10 @@ esp_err_t select_stop(void);
 // 获取UART文件描述符
 // uart.cpp实现
 int get_uart_fd(void);
+
+// 获取UART2文件描述符
+// uart2.cpp实现
+int get_uart2_fd(void);
 
 // 获取TCP服务器文件描述符
 // tcp_server.cpp实现

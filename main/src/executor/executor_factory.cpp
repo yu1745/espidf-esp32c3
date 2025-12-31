@@ -2,6 +2,7 @@
 #include "esp_log.h"
 #include "executor/executor.hpp"
 #include "executor/osr_executor.hpp"
+#include "executor/o6_executor.hpp"
 #include "executor/sr6_executor.hpp"
 #include "executor/sr6can_executor.hpp"
 #include "executor/trrmax_executor.hpp"
@@ -34,10 +35,14 @@ ExecutorFactory::createExecutor(const SettingWrapper &setting) {
       ESP_LOGI(TAG, "创建 SR6CAN Executor");
       return std::make_unique<SR6CANExecutor>(setting);
 
+    case 9:
+      ESP_LOGI(TAG, "创建 O6 Executor (6-Axis Parallel Robot)");
+      return std::make_unique<O6Executor>(setting);
+
     default:
       ESP_LOGE(TAG,
                "未知的 servo mode: %d, 支持的值为: 0(OSR), 3(SR6), 6(TrRMax), "
-               "8(SR6CAN)",
+               "8(SR6CAN), 9(O6)",
                mode);
       return nullptr;
     }
@@ -57,11 +62,13 @@ const char *ExecutorFactory::modeToString(int32_t mode) {
     return "TrRMax";
   case 8:
     return "SR6CAN";
+  case 9:
+    return "O6 (6-Axis Parallel Robot)";
   default:
     return "Unknown";
   }
 }
 
 std::vector<int32_t> ExecutorFactory::getSupportedModes() {
-  return {0, 3, 6, 8};
+  return {0, 3, 6, 8, 9};
 }

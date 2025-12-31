@@ -9,6 +9,7 @@
 #include "static_file_handler.hpp"
 #include "utils.hpp"
 #include "executor/executor_factory.hpp"
+#include "wifi.hpp"
 
 GET("/hello", [](httpd_req_t *req) -> esp_err_t {
   httpd_resp_send(req, "Hello, World!", HTTPD_RESP_USE_STRLEN);
@@ -263,8 +264,8 @@ GET("/api/vol", [](httpd_req_t *req) -> esp_err_t {
   static const char *TAG = "api_vol";
 
   try {
-    // 获取Decoy单例实例并读取电压
-    float voltage = Decoy::getInstance()->getVoltage();
+    // 获取Voltage单例实例并读取电压
+    float voltage = Voltage::getInstance()->getVoltage();
 
     // 分配响应缓冲区
     const size_t response_size = 32;
@@ -372,11 +373,24 @@ POST("/api/setting", [](httpd_req_t *req) -> esp_err_t {
       return ESP_FAIL;
     }
 
+    // 保存旧的配置用于比较 WiFi 设置
+    SettingWrapper old_setting;
+    old_setting.loadFromFile();
+
     // 使用SettingWrapper解码protobuf数据
     SettingWrapper setting(reinterpret_cast<const uint8_t *>(buffer.get()),
                            total_received);
     setting.saveToFile();
     g_executor = ExecutorFactory::createExecutor(setting);
+
+    // 检查 WiFi 配置是否变化
+    if (old_setting.isWifiConfigChanged(setting)) {
+      ESP_LOGI(TAG, "检测到 WiFi 配置变化，重新配置 WiFi...");
+      esp_err_t ret = wifi_reconfigure();
+      if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "WiFi 重新配置失败: %s", esp_err_to_name(ret));
+      }
+    }
 
     // 返回成功响应
     httpd_resp_set_status(req, "200 OK");
@@ -464,7 +478,7 @@ GET("/api/modes", [](httpd_req_t *req) -> esp_err_t {
       }
 
       // 添加mode数字
-      written = snprintf(ptr, remaining, "%d", modes[i]);
+      written = snprintf(ptr, remaining, "%ld", static_cast<long>(modes[i]));
       if (written < 0 || written >= static_cast<int>(remaining)) {
         ESP_LOGE(TAG, "格式化JSON失败");
         httpd_resp_send_500(req);

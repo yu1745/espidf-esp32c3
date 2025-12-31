@@ -8,3 +8,4 @@
 在使用命令时，如果要使用python，先执行conda init然后再执行conda activate base
 在多次修改后仍然报错时，使用context7 mcp来获取最新的代码
 使用context7获取espidf的文档时，id是"/websites/espressif_projects_esp-idf_en_stable_esp32c3"
+espidf的调用直接使用项目根目录的idf.py.ps1

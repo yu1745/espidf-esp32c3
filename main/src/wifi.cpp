@@ -7,182 +7,231 @@
 #include "globals.hpp"
 #include "http/http_router.hpp"
 #include "http/websocket_server.h"
+#include "http/event_websocket.hpp"
+#include "led.hpp"
 #include "nvs_flash.h"
 #include "setting.hpp"
+#include "utils.hpp"
 #include <cstring>
+#include <err.h>
 
-static const char* TAG = "wifi";
+
+static const char *TAG = "wifi";
 
 // HTTP服务器配置
 #define HTTP_SERVER_PORT 80
 
 // 启动HTTP服务器
 esp_err_t http_server_init(void) {
-    httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.stack_size = 8192;
-    config.max_uri_handlers = 32;
-    config.server_port = HTTP_SERVER_PORT;
-    config.lru_purge_enable = true;  // 启用LRU清理
-    config.uri_match_fn = httpd_uri_match_wildcard;
-    config.lru_purge_enable = true;
-    // 启动HTTP服务器
-    esp_err_t ret = httpd_start(&g_http_server, &config);
-    if (ret == ESP_OK) {
-        ESP_LOGI(TAG, "HTTP服务器启动成功，端口: %d", HTTP_SERVER_PORT);
-        g_http_server_running = true;
-    } else {
-        ESP_LOGE(TAG, "HTTP服务器启动失败: %s", esp_err_to_name(ret));
-    }
-    return ret;
+  httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+  config.stack_size = 8192;
+  config.max_uri_handlers = 32;
+  config.server_port = HTTP_SERVER_PORT;
+  config.lru_purge_enable = true; // 启用LRU清理
+  config.uri_match_fn = httpd_uri_match_wildcard;
+  config.lru_purge_enable = true;
+  // 启动HTTP服务器
+  esp_err_t ret = httpd_start(&g_http_server, &config);
+  if (ret == ESP_OK) {
+    ESP_LOGI(TAG, "HTTP服务器启动成功，端口: %d", HTTP_SERVER_PORT);
+    g_http_server_running = true;
+  } else {
+    ESP_LOGE(TAG, "HTTP服务器启动失败: %s", esp_err_to_name(ret));
+  }
+  return ret;
 }
 
 // WiFi事件处理器
-void wifi_event_handler(void* arg,
-                        esp_event_base_t event_base,
-                        int32_t event_id,
-                        void* event_data) {
-    static bool http_server_started = false;
+void wifi_event_handler(void *arg, esp_event_base_t event_base,
+                        int32_t event_id, void *event_data) {
+  static bool http_server_started = false;
+  static bool sta_ever_connected = false; // STA是否曾经成功连接过
 
-    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
-        // STA模式启动
-        ESP_LOGI(TAG, "STA模式启动，尝试连接...");
-        esp_wifi_connect();
-    } else if (event_base == WIFI_EVENT &&
-               event_id == WIFI_EVENT_STA_DISCONNECTED) {
-        // STA模式连接断开
-        ESP_LOGI(TAG, "WiFi连接断开，尝试重连...");
-        esp_wifi_connect();
-    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_AP_START) {
-        // AP模式启动
-        ESP_LOGI(TAG, "AP模式启动");
+  if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
+    // STA模式启动
+    ESP_LOGI(TAG, "STA模式启动，尝试连接...");
+    esp_wifi_connect();
+  } else if (event_base == WIFI_EVENT &&
+             event_id == WIFI_EVENT_STA_DISCONNECTED) {
+    // STA模式连接断开
+    wifi_event_sta_disconnected_t *event =
+        (wifi_event_sta_disconnected_t *)event_data;
+    ESP_LOGI(TAG, "WiFi连接断开，原因: %d", event->reason);
 
-        // 检查是否是纯AP模式（没有STA配置）
-        wifi_mode_t mode;
-        esp_wifi_get_mode(&mode);
-        if (mode == WIFI_MODE_AP && !http_server_started) {
-            ESP_LOGI(TAG, "纯AP模式，启动HTTP服务器");
-
-            // 启动HTTP服务器
-            if (http_server_init() == ESP_OK) {
-                ESP_LOGI(TAG, "HTTP服务器启动成功");
-                // 启动WebSocket服务器
-                if (websocket_server_init(g_http_server) == ESP_OK) {
-                    ESP_LOGI(TAG, "WebSocket服务器启动成功");
-                } else {
-                    ESP_LOGE(TAG, "WebSocket服务器启动失败");
-                }
-                // 注册路由
-                HttpRouter::getInstance().registerAllEndpoints(g_http_server);
-                http_server_started = true;
-            } else {
-                ESP_LOGE(TAG, "HTTP服务器启动失败");
-            }
-        }
-    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_AP_STACONNECTED) {
-        // 作为AP时终端连接成功
-        wifi_event_ap_staconnected_t* event = (wifi_event_ap_staconnected_t*)event_data;
-        ESP_LOGI(TAG, "站点连接: " MACSTR, MAC2STR(event->mac));
-    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_AP_STADISCONNECTED) {
-        // 作为AP时终端断开连接
-        wifi_event_ap_stadisconnected_t* event = (wifi_event_ap_stadisconnected_t*)event_data;
-        ESP_LOGI(TAG, "站点断开: " MACSTR, MAC2STR(event->mac));
-    } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
-        // STA模式获取到IP地址
-        ip_event_got_ip_t* event = (ip_event_got_ip_t*)event_data;
-        ESP_LOGI(TAG, "获取到IP地址: " IPSTR, IP2STR(&event->ip_info.ip));
-
-        if (!http_server_started) {
-            // 启动HTTP服务器
-            if (http_server_init() == ESP_OK) {
-                ESP_LOGI(TAG, "HTTP服务器启动成功");
-            } else {
-                ESP_LOGE(TAG, "HTTP服务器启动失败");
-            }
-            // 启动WebSocket服务器
-            if (websocket_server_init(g_http_server) == ESP_OK) {
-                ESP_LOGI(TAG, "WebSocket服务器启动成功");
-            } else {
-                ESP_LOGE(TAG, "WebSocket服务器启动失败");
-            }
-            // 最后注册/*
-            HttpRouter::getInstance().registerAllEndpoints(g_http_server);
-            http_server_started = true;
-        }
-    } else if (event_base == IP_EVENT && event_id == IP_EVENT_AP_STAIPASSIGNED) {
-        // 作为AP为终端分配IP
-        ip_event_ap_staipassigned_t* event = (ip_event_ap_staipassigned_t*)event_data;
-        ESP_LOGI(TAG, "为站点分配IP: " IPSTR, IP2STR(&event->ip));
+    // 如果从未成功连接过，显示WiFi故障灯
+    if (!sta_ever_connected) {
+      ESP_LOGE(TAG, "WiFi首次连接失败，显示故障码");
+      Led::getInstance()->showErrorCode(WIFI_ERR);
     }
+  } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_AP_START) {
+    // AP模式启动
+    ESP_LOGI(TAG, "AP模式启动");
+
+    // 检查是否是纯AP模式（没有STA配置）
+    wifi_mode_t mode;
+    esp_wifi_get_mode(&mode);
+    if (mode == WIFI_MODE_AP && !http_server_started) {
+      ESP_LOGI(TAG, "纯AP模式，启动HTTP服务器");
+
+      // 启动HTTP服务器
+      if (http_server_init() == ESP_OK) {
+        ESP_LOGI(TAG, "HTTP服务器启动成功");
+        // 启动WebSocket服务器
+        if (websocket_server_init(g_http_server) == ESP_OK) {
+          ESP_LOGI(TAG, "WebSocket服务器启动成功");
+        } else {
+          ESP_LOGE(TAG, "WebSocket服务器启动失败");
+        }
+        // 启动事件WebSocket服务器
+        if (event_websocket_init(g_http_server) == ESP_OK) {
+          ESP_LOGI(TAG, "事件WebSocket服务器启动成功");
+        } else {
+          ESP_LOGE(TAG, "事件WebSocket服务器启动失败");
+        }
+        // 注册路由
+        HttpRouter::getInstance().registerAllEndpoints(g_http_server);
+        http_server_started = true;
+      } else {
+        ESP_LOGE(TAG, "HTTP服务器启动失败");
+      }
+    }
+  } else if (event_base == WIFI_EVENT &&
+             event_id == WIFI_EVENT_AP_STACONNECTED) {
+    // 作为AP时终端连接成功
+    wifi_event_ap_staconnected_t *event =
+        (wifi_event_ap_staconnected_t *)event_data;
+    ESP_LOGI(TAG, "站点连接: " MACSTR, MAC2STR(event->mac));
+  } else if (event_base == WIFI_EVENT &&
+             event_id == WIFI_EVENT_AP_STADISCONNECTED) {
+    // 作为AP时终端断开连接
+    wifi_event_ap_stadisconnected_t *event =
+        (wifi_event_ap_stadisconnected_t *)event_data;
+    ESP_LOGI(TAG, "站点断开: " MACSTR, MAC2STR(event->mac));
+  } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
+    // STA模式获取到IP地址
+    ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
+    ESP_LOGI(TAG, "获取到IP地址: " IPSTR, IP2STR(&event->ip_info.ip));
+
+    // 标记STA已成功连接
+    sta_ever_connected = true;
+
+    // 连接成功，清除故障灯，显示绿灯
+    Led::getInstance()->setSuccess();
+
+    if (!http_server_started) {
+      // 启动HTTP服务器
+      if (http_server_init() == ESP_OK) {
+        ESP_LOGI(TAG, "HTTP服务器启动成功");
+      } else {
+        ESP_LOGE(TAG, "HTTP服务器启动失败");
+      }
+      // 启动WebSocket服务器
+      if (websocket_server_init(g_http_server) == ESP_OK) {
+        ESP_LOGI(TAG, "WebSocket服务器启动成功");
+      } else {
+        ESP_LOGE(TAG, "WebSocket服务器启动失败");
+      }
+      // 启动事件WebSocket服务器
+      if (event_websocket_init(g_http_server) == ESP_OK) {
+        ESP_LOGI(TAG, "事件WebSocket服务器启动成功");
+      } else {
+        ESP_LOGE(TAG, "事件WebSocket服务器启动失败");
+      }
+      // 最后注册/*
+      HttpRouter::getInstance().registerAllEndpoints(g_http_server);
+      http_server_started = true;
+    }
+  } else if (event_base == IP_EVENT && event_id == IP_EVENT_AP_STAIPASSIGNED) {
+    // 作为AP为终端分配IP
+    ip_event_ap_staipassigned_t *event =
+        (ip_event_ap_staipassigned_t *)event_data;
+    ESP_LOGI(TAG, "为站点分配IP: " IPSTR, IP2STR(&event->ip));
+  }
 }
 
 // 初始化WiFi
 void wifi_init(void) {
-    // 如果NVS初始化失败，则擦除后重新初始化
+  static bool s_initialized = false;
+  static bool s_event_handlers_registered = false;
+
+  // 初始化NVS（只执行一次）
+  if (!s_initialized) {
     esp_err_t err = nvs_flash_init();
     if (err == ESP_ERR_NVS_NO_FREE_PAGES ||
         err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        err = nvs_flash_init();
+      ESP_ERROR_CHECK(nvs_flash_erase());
+      err = nvs_flash_init();
     }
     ESP_ERROR_CHECK(err);
     ESP_ERROR_CHECK(esp_netif_init());
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
+    ESP_ERROR_CHECK_IGNORE(esp_event_loop_create_default(),
+                           ESP_ERR_INVALID_STATE);
+    s_initialized = true;
+  }
 
-    // 加载setting配置
-    SettingWrapper setting;
-    try {
-        setting.loadFromFile();
-        ESP_LOGI(TAG, "成功加载WiFi配置");
-    } catch (const std::exception& e) {
-        ESP_LOGE(TAG, "加载WiFi配置失败: %s", e.what());
-        ESP_LOGE(TAG, "使用默认配置");
-        return;
-    }
+  // 加载setting配置
+  SettingWrapper setting;
+  try {
+    setting.loadFromFile();
+    ESP_LOGI(TAG, "成功加载WiFi配置");
+  } catch (const std::exception &e) {
+    ESP_LOGE(TAG, "加载WiFi配置失败: %s", e.what());
+    ESP_LOGE(TAG, "使用默认配置");
+    return;
+  }
 
-    // 检查配置是否有效
-    bool has_ap_config = strlen(setting->wifi.soft_ap_ssid) > 0;
-    bool has_sta_config = strlen(setting->wifi.ssid) > 0;
-    bool enable_soft_ap = setting->wifi.enable_soft_ap;
+  // 检查配置是否有效
+  bool has_ap_config = strlen(setting->wifi.soft_ap_ssid) > 0;
+  bool has_sta_config = strlen(setting->wifi.ssid) > 0;
+  bool enable_soft_ap = setting->wifi.enable_soft_ap;
 
-    ESP_LOGI(TAG, "WiFi配置状态:");
-    ESP_LOGI(TAG, "  AP SSID: %s", has_ap_config ? setting->wifi.soft_ap_ssid : "未配置");
-    ESP_LOGI(TAG, "  STA SSID: %s", has_sta_config ? setting->wifi.ssid : "未配置");
-    ESP_LOGI(TAG, "  Enable Soft AP: %s", enable_soft_ap ? "true" : "false");
+  ESP_LOGI(TAG, "WiFi配置状态:");
+  ESP_LOGI(TAG, "  AP SSID: %s",
+           has_ap_config ? setting->wifi.soft_ap_ssid : "未配置");
+  ESP_LOGI(TAG, "  STA SSID: %s",
+           has_sta_config ? setting->wifi.ssid : "未配置");
+  ESP_LOGI(TAG, "  Enable Soft AP: %s", enable_soft_ap ? "true" : "false");
 
-    // 确定WiFi模式
-    wifi_mode_t wifi_mode = WIFI_MODE_NULL;
-    bool enable_ap = has_ap_config && enable_soft_ap;
-    bool enable_sta = has_sta_config;
+  // 确定WiFi模式
+  wifi_mode_t wifi_mode = WIFI_MODE_NULL;
+  bool enable_ap = has_ap_config && enable_soft_ap;
+  bool enable_sta = has_sta_config;
 
-    if (enable_ap && enable_sta) {
-        wifi_mode = WIFI_MODE_APSTA;
-        ESP_LOGI(TAG, "使用AP+STA共存模式");
-    } else if (enable_ap) {
-        wifi_mode = WIFI_MODE_AP;
-        ESP_LOGI(TAG, "使用AP模式");
-    } else if (enable_sta) {
-        wifi_mode = WIFI_MODE_STA;
-        ESP_LOGI(TAG, "使用STA模式");
-    } else {
-        ESP_LOGE(TAG, "没有有效的WiFi配置");
-        return;
-    }
+  if (enable_ap && enable_sta) {
+    wifi_mode = WIFI_MODE_APSTA;
+    ESP_LOGI(TAG, "使用AP+STA共存模式");
+  } else if (enable_ap) {
+    wifi_mode = WIFI_MODE_AP;
+    ESP_LOGI(TAG, "使用AP模式");
+  } else if (enable_sta) {
+    wifi_mode = WIFI_MODE_STA;
+    ESP_LOGI(TAG, "使用STA模式");
+  } else {
+    ESP_LOGE(TAG, "没有有效的WiFi配置");
+    return;
+  }
 
-    // 创建对应的netif
+  // 创建netif（只执行一次）
+  if (!s_event_handlers_registered) {
     if (enable_sta) {
-        esp_netif_create_default_wifi_sta();
+      esp_netif_create_default_wifi_sta();
     }
     if (enable_ap) {
-        esp_netif_create_default_wifi_ap();
+      esp_netif_create_default_wifi_ap();
     }
+  }
 
+  // 初始化WiFi驱动（只执行一次）
+  if (!s_event_handlers_registered) {
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+  }
 
-    // 设置WiFi模式（必须在配置之前设置）
-    ESP_ERROR_CHECK(esp_wifi_set_mode(wifi_mode));
+  // 设置WiFi模式（必须在配置之前设置）
+  ESP_ERROR_CHECK(esp_wifi_set_mode(wifi_mode));
 
-    // 注册事件处理器
+  // 注册事件处理器（只执行一次）
+  if (!s_event_handlers_registered) {
     esp_event_handler_instance_t instance_any_id;
     esp_event_handler_instance_t instance_got_ip;
     ESP_ERROR_CHECK(esp_event_handler_instance_register(
@@ -191,53 +240,166 @@ void wifi_init(void) {
 
     // 根据WiFi模式注册相应的IP事件
     if (enable_sta) {
-        ESP_ERROR_CHECK(esp_event_handler_instance_register(
-            IP_EVENT, IP_EVENT_STA_GOT_IP, &wifi_event_handler, NULL,
-            &instance_got_ip));
+      ESP_ERROR_CHECK(esp_event_handler_instance_register(
+          IP_EVENT, IP_EVENT_STA_GOT_IP, &wifi_event_handler, NULL,
+          &instance_got_ip));
     }
     if (enable_ap) {
-        ESP_ERROR_CHECK(esp_event_handler_instance_register(
-            IP_EVENT, IP_EVENT_AP_STAIPASSIGNED, &wifi_event_handler, NULL,
-            &instance_got_ip));
+      ESP_ERROR_CHECK(esp_event_handler_instance_register(
+          IP_EVENT, IP_EVENT_AP_STAIPASSIGNED, &wifi_event_handler, NULL,
+          &instance_got_ip));
     }
+    s_event_handlers_registered = true;
+  }
 
-    // 配置STA
-    if (enable_sta) {
-        wifi_config_t sta_config = {};
-        strncpy((char*)sta_config.sta.ssid, setting->wifi.ssid, sizeof(sta_config.sta.ssid) - 1);
-        strncpy((char*)sta_config.sta.password, setting->wifi.password, sizeof(sta_config.sta.password) - 1);
-        sta_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
+  // 配置STA
+  if (enable_sta) {
+    wifi_config_t sta_config = {};
+    strncpy((char *)sta_config.sta.ssid, setting->wifi.ssid,
+            sizeof(sta_config.sta.ssid) - 1);
+    strncpy((char *)sta_config.sta.password, setting->wifi.password,
+            sizeof(sta_config.sta.password) - 1);
+    sta_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
 
-        ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &sta_config));
-        ESP_LOGI(TAG, "STA配置完成，SSID: %s", sta_config.sta.ssid);
+    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &sta_config));
+    ESP_LOGI(TAG, "STA配置完成，SSID: %s", sta_config.sta.ssid);
+  }
+
+  // 配置AP
+  if (enable_ap) {
+    wifi_config_t ap_config = {};
+    strncpy((char *)ap_config.ap.ssid, setting->wifi.soft_ap_ssid,
+            sizeof(ap_config.ap.ssid) - 1);
+    ap_config.ap.ssid_len = strlen(setting->wifi.soft_ap_ssid);
+    if (strlen(setting->wifi.soft_ap_password) > 0) {
+      strncpy((char *)ap_config.ap.password, setting->wifi.soft_ap_password,
+              sizeof(ap_config.ap.password) - 1);
+      ap_config.ap.authmode = WIFI_AUTH_WPA2_PSK;
+    } else {
+      ap_config.ap.authmode = WIFI_AUTH_OPEN;
     }
+    ap_config.ap.max_connection = 4;
 
-    // 配置AP
-    if (enable_ap) {
-        wifi_config_t ap_config = {};
-        strncpy((char*)ap_config.ap.ssid, setting->wifi.soft_ap_ssid, sizeof(ap_config.ap.ssid) - 1);
-        ap_config.ap.ssid_len = strlen(setting->wifi.soft_ap_ssid);
-        if (strlen(setting->wifi.soft_ap_password) > 0) {
-            strncpy((char*)ap_config.ap.password, setting->wifi.soft_ap_password, sizeof(ap_config.ap.password) - 1);
-            ap_config.ap.authmode = WIFI_AUTH_WPA2_PSK;
-        } else {
-            ap_config.ap.authmode = WIFI_AUTH_OPEN;
-        }
-        ap_config.ap.max_connection = 4;
+    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &ap_config));
+    ESP_LOGI(TAG, "AP配置完成，SSID: %s, 密码保护: %s", ap_config.ap.ssid,
+             ap_config.ap.authmode == WIFI_AUTH_OPEN ? "否" : "是");
+  }
 
-        ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &ap_config));
-        ESP_LOGI(TAG, "AP配置完成，SSID: %s, 密码保护: %s", ap_config.ap.ssid,
-                 ap_config.ap.authmode == WIFI_AUTH_OPEN ? "否" : "是");
+  // 启动WiFi
+  ESP_ERROR_CHECK(esp_wifi_start());
 
-        // 如果只有AP模式，需要在AP启动后启动HTTP服务器
-        if (!enable_sta) {
-            // 这里需要等待AP启动，通常在WIFI_EVENT_AP_START事件中处理
-            // 但为了简化，我们也可以在AP启动事件中启动服务器
-        }
+  ESP_LOGI(TAG, "WiFi初始化完成，模式: %d", wifi_mode);
+}
+
+// 重新配置WiFi连接（用于修改setting后重新连接）
+esp_err_t wifi_reconfigure(void) {
+  ESP_LOGI(TAG, "重新配置WiFi连接...");
+
+  // 尝试停止WiFi来检查初始化状态
+  esp_err_t ret = esp_wifi_stop();
+  if (ret == ESP_ERR_WIFI_NOT_INIT) {
+    ESP_LOGE(TAG, "WiFi未初始化，请先调用wifi_init()");
+    return ESP_ERR_INVALID_STATE;
+  } else if (ret != ESP_OK && ret != ESP_ERR_WIFI_NOT_STARTED) {
+    ESP_LOGE(TAG, "停止WiFi失败: %s", esp_err_to_name(ret));
+    return ret;
+  }
+
+  // 加载新的setting配置
+  SettingWrapper setting;
+  try {
+    setting.loadFromFile();
+    ESP_LOGI(TAG, "成功加载新的WiFi配置");
+  } catch (const std::exception &e) {
+    ESP_LOGE(TAG, "加载WiFi配置失败: %s", e.what());
+    return ESP_FAIL;
+  }
+
+  // 检查配置是否有效
+  bool has_ap_config = strlen(setting->wifi.soft_ap_ssid) > 0;
+  bool has_sta_config = strlen(setting->wifi.ssid) > 0;
+  bool enable_soft_ap = setting->wifi.enable_soft_ap;
+
+  ESP_LOGI(TAG, "新WiFi配置:");
+  ESP_LOGI(TAG, "  AP SSID: %s",
+           has_ap_config ? setting->wifi.soft_ap_ssid : "未配置");
+  ESP_LOGI(TAG, "  STA SSID: %s",
+           has_sta_config ? setting->wifi.ssid : "未配置");
+  ESP_LOGI(TAG, "  Enable Soft AP: %s", enable_soft_ap ? "true" : "false");
+
+  // 确定WiFi模式
+  wifi_mode_t wifi_mode = WIFI_MODE_NULL;
+  bool enable_ap = has_ap_config && enable_soft_ap;
+  bool enable_sta = has_sta_config;
+
+  if (enable_ap && enable_sta) {
+    wifi_mode = WIFI_MODE_APSTA;
+    ESP_LOGI(TAG, "使用AP+STA共存模式");
+  } else if (enable_ap) {
+    wifi_mode = WIFI_MODE_AP;
+    ESP_LOGI(TAG, "使用AP模式");
+  } else if (enable_sta) {
+    wifi_mode = WIFI_MODE_STA;
+    ESP_LOGI(TAG, "使用STA模式");
+  } else {
+    ESP_LOGE(TAG, "没有有效的WiFi配置");
+    return ESP_FAIL;
+  }
+
+  // 设置新的WiFi模式
+  ret = esp_wifi_set_mode(wifi_mode);
+  if (ret != ESP_OK) {
+    ESP_LOGE(TAG, "设置WiFi模式失败: %s", esp_err_to_name(ret));
+    return ret;
+  }
+
+  // 配置STA
+  if (enable_sta) {
+    wifi_config_t sta_config = {};
+    strncpy((char *)sta_config.sta.ssid, setting->wifi.ssid,
+            sizeof(sta_config.sta.ssid) - 1);
+    strncpy((char *)sta_config.sta.password, setting->wifi.password,
+            sizeof(sta_config.sta.password) - 1);
+    sta_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
+
+    ret = esp_wifi_set_config(WIFI_IF_STA, &sta_config);
+    if (ret != ESP_OK) {
+      ESP_LOGE(TAG, "设置STA配置失败: %s", esp_err_to_name(ret));
+      return ret;
     }
+    ESP_LOGI(TAG, "STA配置完成，SSID: %s", sta_config.sta.ssid);
+  }
 
-    // 启动WiFi
-    ESP_ERROR_CHECK(esp_wifi_start());
+  // 配置AP
+  if (enable_ap) {
+    wifi_config_t ap_config = {};
+    strncpy((char *)ap_config.ap.ssid, setting->wifi.soft_ap_ssid,
+            sizeof(ap_config.ap.ssid) - 1);
+    ap_config.ap.ssid_len = strlen(setting->wifi.soft_ap_ssid);
+    if (strlen(setting->wifi.soft_ap_password) > 0) {
+      strncpy((char *)ap_config.ap.password, setting->wifi.soft_ap_password,
+              sizeof(ap_config.ap.password) - 1);
+      ap_config.ap.authmode = WIFI_AUTH_WPA2_PSK;
+    } else {
+      ap_config.ap.authmode = WIFI_AUTH_OPEN;
+    }
+    ap_config.ap.max_connection = 4;
 
-    ESP_LOGI(TAG, "WiFi初始化完成，模式: %d", wifi_mode);
+    ret = esp_wifi_set_config(WIFI_IF_AP, &ap_config);
+    if (ret != ESP_OK) {
+      ESP_LOGE(TAG, "设置AP配置失败: %s", esp_err_to_name(ret));
+      return ret;
+    }
+    ESP_LOGI(TAG, "AP配置完成，SSID: %s", ap_config.ap.ssid);
+  }
+
+  // 重新启动WiFi
+  ret = esp_wifi_start();
+  if (ret != ESP_OK) {
+    ESP_LOGE(TAG, "启动WiFi失败: %s", esp_err_to_name(ret));
+    return ret;
+  }
+
+  ESP_LOGI(TAG, "WiFi重新配置完成");
+  return ESP_OK;
 }

@@ -19,6 +19,8 @@ public:
      *          - 0: OSR (Multi-Axis Motion)
      *          - 3: SR6
      *          - 6: TrRMax
+     *          - 8: SR6CAN
+     *          - 9: O6 (6-Axis Parallel Robot)
      * @param setting 配置对象
      * @return Executor 智能指针，如果 mode 无效返回 nullptr
      * @throws std::runtime_error 如果创建 executor 失败

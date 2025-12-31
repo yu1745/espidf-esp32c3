@@ -118,3 +118,78 @@ std::string getBuildParameters();
 
 // 使用VFS API实现ls功能
 void list_root_directory();
+
+/**
+ * @brief 打印所有编译选项的开启状态
+ *
+ * 打印 def.h 中定义的所有 CONFIG_ENABLE_* 配置选项的状态
+ */
+void printBuildConfigOptions();
+
+/**
+ * @brief 带LED故障码显示的错误检查宏
+ * @param _expr 要检查的表达式（esp_err_t类型）
+ * @param _err_code 故障码（err.h中定义）
+ *
+ * 如果表达式返回ESP_OK，继续执行
+ * 如果表达式返回错误：
+ *   1. 如果LED已初始化（s_led_initialized为true），显示对应的故障码
+ *   2. 调用ESP_ERROR_CHECK中止程序并显示错误信息
+ *
+ * 注意：需要在使用的文件中声明外部变量：extern bool s_led_initialized;
+ *       并且需要包含 led.hpp 头文件
+ */
+#define ESP_ERROR_CHECK_WITH_LED(_expr, _err_code) do { \
+    esp_err_t _err_rc = (_expr); \
+    if (_err_rc != ESP_OK) { \
+        if (s_led_initialized) { \
+            Led::getInstance()->showErrorCode(_err_code); \
+            vTaskDelay(pdMS_TO_TICKS(100)); \
+        } \
+        ESP_ERROR_CHECK(_err_rc); \
+    } \
+} while(0)
+
+/**
+ * @brief 带忽略特定错误码的错误检查宏
+ * @param _expr 要检查的表达式（esp_err_t类型）
+ * @param _ignore_err_code 要忽略的错误码
+ *
+ * 如果表达式返回ESP_OK或指定的忽略错误码，继续执行
+ * 如果表达式返回其他错误，调用ESP_ERROR_CHECK中止程序并显示错误信息
+ *
+ * 使用场景：当某个函数可能返回"已初始化"或"不存在"等非致命错误时
+ */
+#define ESP_ERROR_CHECK_IGNORE(_expr, _ignore_err_code) do { \
+    esp_err_t _err_rc = (_expr); \
+    if (_err_rc != ESP_OK && _err_rc != (_ignore_err_code)) { \
+        ESP_ERROR_CHECK(_err_rc); \
+    } \
+} while(0)
+
+/**
+ * @brief 带忽略多个错误码的错误检查宏
+ * @param _expr 要检查的表达式（esp_err_t类型）
+ * @param ... 要忽略的错误码列表（可变参数）
+ *
+ * 如果表达式返回ESP_OK或任意一个指定的忽略错误码，继续执行
+ * 如果表达式返回其他错误，调用ESP_ERROR_CHECK中止程序并显示错误信息
+ *
+ * 使用场景：当某个函数可能返回多个非致命错误时
+ */
+#define ESP_ERROR_CHECK_IGNORE_MULTI(_expr, ...) do { \
+    esp_err_t _err_rc = (_expr); \
+    if (_err_rc != ESP_OK) { \
+        esp_err_t _ignore_errs[] = {__VA_ARGS__}; \
+        bool _should_ignore = false; \
+        for (size_t _i = 0; _i < sizeof(_ignore_errs)/sizeof(_ignore_errs[0]); _i++) { \
+            if (_err_rc == _ignore_errs[_i]) { \
+                _should_ignore = true; \
+                break; \
+            } \
+        } \
+        if (!_should_ignore) { \
+            ESP_ERROR_CHECK(_err_rc); \
+        } \
+    } \
+} while(0)

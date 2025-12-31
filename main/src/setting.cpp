@@ -12,8 +12,8 @@ const char* SettingWrapper::TAG = "SettingWrapper";
 
 Setting default_setting = {
     {
-        "ZTE-Y55AcX",       // ssid (Wifi.ssid)
-        "asdk7788",       // password (Wifi.password)
+        "",       // ssid (Wifi.ssid)
+        "",       // password (Wifi.password)
         0,        // static_ip (Wifi.static_ip)
         0,        // gateway (Wifi.gateway)
         0,        // dns (Wifi.dns)
@@ -418,4 +418,25 @@ void SettingWrapper::printServoSetting() const {
     ESP_LOGI(TAG, "  MODE: %.3f", servo.MODE);
 
     ESP_LOGI(TAG, "================================");
+}
+
+bool SettingWrapper::isWifiConfigChanged(const SettingWrapper &other) const {
+    if (!m_setting || !other.m_setting) {
+        ESP_LOGE(TAG, "Setting 结构体为空，无法比较 WiFi 配置");
+        return false;
+    }
+
+    // 直接比较整个 WiFi 结构体
+    bool changed = memcmp(&m_setting->wifi, &other.m_setting->wifi, sizeof(Setting_Wifi)) != 0;
+
+    if (changed) {
+        const Setting_Wifi &this_wifi = m_setting->wifi;
+        const Setting_Wifi &other_wifi = other.m_setting->wifi;
+        ESP_LOGI(TAG, "WiFi 配置发生变化:");
+        ESP_LOGI(TAG, "  SSID: '%s' -> '%s'", this_wifi.ssid, other_wifi.ssid);
+        ESP_LOGI(TAG, "  AP SSID: '%s' -> '%s'", this_wifi.soft_ap_ssid, other_wifi.soft_ap_ssid);
+        ESP_LOGI(TAG, "  启用 AP: %d -> %d", this_wifi.enable_soft_ap, other_wifi.enable_soft_ap);
+    }
+
+    return changed;
 }

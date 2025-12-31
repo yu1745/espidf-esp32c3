@@ -49,6 +49,24 @@ config ENABLE_DECOY
     help
         Enable decoy/voltage control function.
 
+config ENABLE_MDNS
+    bool "Enable mDNS"
+    default y
+    help
+        Enable mDNS functionality.
+
+config ENABLE_HANDY
+    bool "Enable Handy Support"
+    default y
+    help
+        Enable Handy device support functionality.
+
+config ENABLE_UART2
+    bool "Enable UART2"
+    default n
+    help
+        Enable UART2 functionality.
+
 choice SERVO_MODE
     prompt "Servo Mode"
     default SERVO_MODE_OSR
@@ -69,6 +87,8 @@ choice SERVO_MODE
         bool "SR6_SHALI Mode"
     config SERVO_MODE_SR6CAN
         bool "SR6CAN Mode"
+    config SERVO_MODE_O6
+        bool "O6 Mode"
 
 endchoice
 

@@ -15,6 +15,7 @@
 
 // 定义事件基
 ESP_EVENT_DEFINE_BASE(EXECUTOR_EVENT);
+ESP_EVENT_DEFINE_BASE(MOTION_EVENT);
 
 /**
  * @brief Executor构造函数
@@ -505,6 +506,21 @@ void Executor::eventHandler(void *handler_arg, esp_event_base_t event_base,
                "stddev=%.3f ms, max=%.3f ms, freq=%.2f Hz",
                window_seconds, execute_avg_ms, execute_stddev_ms,
                execute_max_ms, execute_freq);
+
+      // 发送统计事件
+      motion_stats_event_data_t stats_event = {
+          .compute_avg_ms = compute_avg_ms,
+          .compute_stddev_ms = compute_stddev_ms,
+          .compute_max_ms = compute_max_ms,
+          .compute_freq = compute_freq,
+          .execute_avg_ms = execute_avg_ms,
+          .execute_stddev_ms = execute_stddev_ms,
+          .execute_max_ms = execute_max_ms,
+          .execute_freq = execute_freq,
+          .window_seconds = window_seconds,
+      };
+      esp_event_post(MOTION_EVENT, MOTION_EVENT_STATS, &stats_event,
+                     sizeof(stats_event), pdMS_TO_TICKS(100));
 
       // 重置统计信息，开始新的窗口
       stats.compute_total_duration = 0;

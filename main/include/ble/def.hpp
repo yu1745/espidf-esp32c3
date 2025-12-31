@@ -4,14 +4,17 @@
 #include "ble_router.hpp"
 #include "decoy.hpp"
 #include "esp_netif.h"
+#include "esp_system.h"
 #include "esp_netif_types.h"
 #include "executor/executor_factory.hpp"
 #include "globals.hpp"
+#include "handyplug/handy_handler.hpp"
 #include "host/ble_uuid.h"
 #include "os/os_mbuf.h"
 #include "select_thread.hpp"
 #include "setting.hpp"
 #include "utils.hpp"
+#include "wifi.hpp"
 #include <cstdlib>
 #include <cstring>
 #include <memory>
@@ -35,6 +38,9 @@ static ble_uuid128_t tcode_version_uuid;
 
 // 电压特征UUID定义 (VOL_UUID: "27920f48-71db-4909-aab7-a3b2f83e4226")
 static ble_uuid128_t tcode_vol_uuid;
+
+// 重启特征UUID定义 (RESTART_UUID: "27920f48-71db-4909-aab7-a3b2f83e4227")
+static ble_uuid128_t tcode_restart_uuid;
 
 // Handy服务UUID定义 (HANDY_SERVICE_UUID:
 // "1775244d-6b43-439b-877c-060f2d9bed07")
@@ -62,6 +68,8 @@ EXEC_LAMBDA([]() {
   memcpy(&tcode_version_uuid, &temp_uuid, sizeof(ble_uuid128_t));
   ble_uuid_from_str(&temp_uuid, "27920f48-71db-4909-aab7-a3b2f83e4226");
   memcpy(&tcode_vol_uuid, &temp_uuid, sizeof(ble_uuid128_t));
+  ble_uuid_from_str(&temp_uuid, "27920f48-71db-4909-aab7-a3b2f83e4227");
+  memcpy(&tcode_restart_uuid, &temp_uuid, sizeof(ble_uuid128_t));
   ble_uuid_from_str(&temp_uuid, "1775244d-6b43-439b-877c-060f2d9bed07");
   memcpy(&handy_svc_uuid, &temp_uuid, sizeof(ble_uuid128_t));
   ble_uuid_from_str(&temp_uuid, "1775ff51-6b43-439b-877c-060f2d9bed07");
@@ -72,7 +80,7 @@ EXEC_LAMBDA([]() {
 
 // 主服务注册
 BLE_SERVICE(&tcode_svc_uuid.u)
-//tcode
+// tcode
 WRITE_CHR(
     &tcode_chr_uuid.u,
     [](uint16_t conn_handle, uint16_t attr_handle,
@@ -222,10 +230,24 @@ READ_WRITE_CHR(
           }
 
           ESP_LOGI(TAG, "Setting数据接收大小: %zu 字节", recv_size);
+
+          // 保存旧的配置用于比较 WiFi 设置
+          SettingWrapper old_setting;
+          old_setting.loadFromFile();
+
           // 使用SettingWrapper解码protobuf数据
           SettingWrapper setting(buffer.get(), recv_size);
           setting.saveToFile();
           g_executor = ExecutorFactory::createExecutor(setting);
+
+          // 检查 WiFi 配置是否变化
+          if (old_setting.isWifiConfigChanged(setting)) {
+            ESP_LOGI(TAG, "检测到 WiFi 配置变化，重新配置 WiFi...");
+            esp_err_t ret = wifi_reconfigure();
+            if (ret != ESP_OK) {
+              ESP_LOGW(TAG, "WiFi 重新配置失败: %s", esp_err_to_name(ret));
+            }
+          }
 
           ESP_LOGI(TAG, "Setting数据接收并解码成功，大小: %zu 字节", recv_size);
           return 0;
@@ -416,8 +438,8 @@ READ_WRITE_CHR(
       case BLE_GATT_ACCESS_OP_READ_CHR: {
         // 对应HTTP GET /api/vol
         try {
-          // 获取Decoy单例实例并读取电压
-          float voltage = Decoy::getInstance()->getVoltage();
+          // 获取Voltage单例实例并读取电压
+          float voltage = Voltage::getInstance()->getVoltage();
 
           // 分配响应缓冲区
           const size_t response_size = 32;
@@ -522,14 +544,37 @@ READ_WRITE_CHR(
       }
     },
     nullptr)
+// /api/restart
+WRITE_CHR(
+    &tcode_restart_uuid.u,
+    [](uint16_t conn_handle, uint16_t attr_handle,
+       struct ble_gatt_access_ctxt *ctxt, void *arg) -> int {
+      static const char *TAG = "BLE_RESTART";
+
+      switch (ctxt->op) {
+      case BLE_GATT_ACCESS_OP_WRITE_CHR: {
+        // 对应HTTP GET /api/restart
+        // 任意写入值都会触发重启
+        ESP_LOGI(TAG, "收到重启请求，正在重启设备...");
+        esp_restart();
+        // 注意：esp_restart() 不会立即返回，但为了编译正确，我们保留返回语句
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        return 0;
+      }
+      default:
+        return BLE_ATT_ERR_UNLIKELY;
+      }
+    },
+    nullptr)
 BLE_SERVICE_END()
 
 // Handy服务注册
 BLE_SERVICE(&handy_svc_uuid.u)
-NOTIFY_CHR(
+WRITE_CHR(
     &handy_chr_uuid1.u,
     [](uint16_t conn_handle, uint16_t attr_handle,
        struct ble_gatt_access_ctxt *ctxt, void *arg) -> int {
+      static const char *TAG = "BLE_HANDY1";
       static uint8_t handy_chr_val[256] = {};
       memset(handy_chr_val, 0, sizeof(handy_chr_val));
 
@@ -537,26 +582,39 @@ NOTIFY_CHR(
       case BLE_GATT_ACCESS_OP_WRITE_CHR:
         if (ctxt->om->om_len <= sizeof(handy_chr_val)) {
           memcpy(handy_chr_val, ctxt->om->om_data, ctxt->om->om_len);
+
+          // 将数据写入handy队列
+          if (handy_queue != nullptr) {
+            // 分配std::string对象
+            std::string* data = new std::string((char*)handy_chr_val, ctxt->om->om_len);
+
+            // 发送到队列
+            if (xQueueSend(handy_queue, &data, pdMS_TO_TICKS(100)) != pdTRUE) {
+              // 发送失败，释放内存
+              delete data;
+              ESP_LOGW(TAG, "Failed to send handy data to handy queue");
+            } else {
+              ESP_LOGD(TAG, "Sent handy data to queue, size: %d", ctxt->om->om_len);
+            }
+          } else {
+            ESP_LOGW(TAG, "handy_queue is null, cannot send handy data");
+          }
+
           return 0;
         } else {
           return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
         }
-      case BLE_GATT_ACCESS_OP_READ_CHR:
-        if (ctxt->om->om_len >= sizeof(handy_chr_val)) {
-          memcpy(ctxt->om->om_data, handy_chr_val, sizeof(handy_chr_val));
-          return 0;
-        } else {
-          return BLE_ATT_ERR_INSUFFICIENT_RES;
-        }
       default:
+        ESP_LOGE(TAG, "Unsupported operation: %d", ctxt->op);
         return BLE_ATT_ERR_UNLIKELY;
       }
     },
     nullptr)
-NOTIFY_CHR(
+WRITE_CHR(
     &handy_chr_uuid2.u,
     [](uint16_t conn_handle, uint16_t attr_handle,
        struct ble_gatt_access_ctxt *ctxt, void *arg) -> int {
+      static const char *TAG = "BLE_HANDY2";
       static uint8_t handy_chr_val2[256] = {};
       memset(handy_chr_val2, 0, sizeof(handy_chr_val2));
 
@@ -564,18 +622,30 @@ NOTIFY_CHR(
       case BLE_GATT_ACCESS_OP_WRITE_CHR:
         if (ctxt->om->om_len <= sizeof(handy_chr_val2)) {
           memcpy(handy_chr_val2, ctxt->om->om_data, ctxt->om->om_len);
+
+          // 将数据写入handy队列
+          if (handy_queue != nullptr) {
+            // 分配std::string对象
+            std::string* data = new std::string((char*)handy_chr_val2, ctxt->om->om_len);
+
+            // 发送到队列
+            if (xQueueSend(handy_queue, &data, pdMS_TO_TICKS(100)) != pdTRUE) {
+              // 发送失败，释放内存
+              delete data;
+              ESP_LOGW(TAG, "Failed to send handy data to handy queue");
+            } else {
+              ESP_LOGD(TAG, "Sent handy data to queue, size: %d", ctxt->om->om_len);
+            }
+          } else {
+            ESP_LOGW(TAG, "handy_queue is null, cannot send handy data");
+          }
+
           return 0;
         } else {
           return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
         }
-      case BLE_GATT_ACCESS_OP_READ_CHR:
-        if (ctxt->om->om_len >= sizeof(handy_chr_val2)) {
-          memcpy(ctxt->om->om_data, handy_chr_val2, sizeof(handy_chr_val2));
-          return 0;
-        } else {
-          return BLE_ATT_ERR_INSUFFICIENT_RES;
-        }
       default:
+        ESP_LOGE(TAG, "Unsupported operation: %d", ctxt->op);
         return BLE_ATT_ERR_UNLIKELY;
       }
     },

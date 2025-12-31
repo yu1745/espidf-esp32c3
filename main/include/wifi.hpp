@@ -10,8 +10,11 @@
 // HTTP服务器初始化函数
 esp_err_t http_server_init(void);
 
-// WiFi初始化函数
+// WiFi初始化函数（可重复调用）
 void wifi_init(void);
+
+// 重新配置WiFi连接（用于修改setting后重新连接）
+esp_err_t wifi_reconfigure(void);
 
 // WiFi事件处理器
 void wifi_event_handler(void* arg,

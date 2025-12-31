@@ -7,11 +7,11 @@
 #include "freertos/task.h"
 #include "globals.hpp"
 #include "select_thread.hpp"
+#include "uart/usb_monitor.hpp"
 #include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-
 
 namespace {
 const char *TAG = "uart";
@@ -54,7 +54,14 @@ esp_err_t uart_init() {
     ESP_LOGI(TAG, "USB serial JTAG file descriptor: %d", uart_fd);
   }
 
-  printf("USB serial JTAG initialized successfully\n");
+  ESP_LOGI(TAG, "USB serial JTAG initialized successfully");
+
+  // 初始化USB监控模块
+  if (usb_monitor_init() != ESP_OK) {
+    ESP_LOGW(TAG, "Failed to initialize USB monitor");
+    // 不影响UART初始化，继续执行
+  }
+
   return ESP_OK;
 }
 
@@ -62,7 +69,7 @@ esp_err_t uart_init() {
 int get_uart_fd(void) { return uart_fd; }
 
 // 通过UART发送数据
-esp_err_t uart_send_response(const char* data, size_t len) {
+esp_err_t uart_send_response(const char *data, size_t len) {
   if (uart_fd < 0) {
     ESP_LOGE(TAG, "UART file descriptor is invalid");
     return ESP_ERR_INVALID_STATE;
@@ -111,8 +118,8 @@ void uart_handle_data(void) {
     data_packet_t *packet = (data_packet_t *)malloc(sizeof(data_packet_t));
     if (packet != NULL) {
       packet->source = DATA_SOURCE_UART;
-      packet->client_fd = -1; // UART没有客户端文件描述符
-      packet->user_data = NULL;  // UART不需要user_data
+      packet->client_fd = -1;   // UART没有客户端文件描述符
+      packet->user_data = NULL; // UART不需要user_data
       packet->data = (uint8_t *)malloc(bytes_read);
       if (packet->data != NULL) {
         memcpy(packet->data, buffer, bytes_read);
@@ -136,3 +143,6 @@ void uart_handle_data(void) {
     }
   }
 }
+
+// 检测USB串口是否连接
+bool uart_is_usb_connected(void) { return usb_serial_jtag_is_connected(); }

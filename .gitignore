@@ -1,5 +1,6 @@
 # Build outputs
 build/
+build_*/
 
 # Dependencies
 managed_components/

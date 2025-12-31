@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(C:\\Users\\wangyu\\Documents\\PlatformIO\\Projects\\tcode_esp32c3\\src\\exe\\O6Executor.cpp)",
+      "Read(C:\\Users\\wangyu\\Documents\\PlatformIO\\Projects\\tcode_esp32c3\\src\\exe\\O6Executor.hpp)",
+      "Read(C:\\Users\\wangyu\\Documents\\PlatformIO\\Projects\\tcode_esp32c3\\src\\O6.cpp)",
+      "Read(C:\\Users\\wangyu\\Documents\\PlatformIO\\Projects\\tcode_esp32c3\\src\\O6.hpp)",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__query-docs",
+      "mcp__plugin_context7_context7__resolve-library-id",
+      "mcp__plugin_context7_context7__query-docs",
+      "Bash(.\\\\idf.py.ps1:*)",
+      "Bash(pwsh:*)",
+      "Bash(powershell.exe:*)",
+      "Bash(python:*)",
+      "Bash(cmd.exe /c \"powershell.exe -ExecutionPolicy Bypass -File idf.py.ps1 build\")",
+      "Bash(idf.py build:*)",
+      "Bash(export:*)",
+      "Bash(git mv:*)"
+    ]
+  }
+}

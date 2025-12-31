@@ -2,3 +2,34 @@
 
 #define FIRMWARE_VERSION "tcode-espidf-v1.0.0"
 #define PI 3.1415926f
+
+#ifndef CONFIG_ENABLE_WIFI
+#define CONFIG_ENABLE_WIFI 0
+#endif
+#ifndef CONFIG_ENABLE_BLE
+#define CONFIG_ENABLE_BLE 0
+#endif
+#ifndef CONFIG_ENABLE_LED
+#define CONFIG_ENABLE_LED 0
+#endif
+#ifndef CONFIG_ENABLE_TEMP
+#define CONFIG_ENABLE_TEMP 0
+#endif
+#ifndef CONFIG_ENABLE_BUTTON
+#define CONFIG_ENABLE_BUTTON 0
+#endif
+#ifndef CONFIG_ENABLE_VOLTAGE
+#define CONFIG_ENABLE_VOLTAGE 0
+#endif
+#ifndef CONFIG_ENABLE_DECOY
+#define CONFIG_ENABLE_DECOY 0
+#endif
+#ifndef CONFIG_ENABLE_MDNS
+#define CONFIG_ENABLE_MDNS 0
+#endif
+#ifndef CONFIG_ENABLE_HANDY
+#define CONFIG_ENABLE_HANDY 0
+#endif
+#ifndef CONFIG_ENABLE_UART2
+#define CONFIG_ENABLE_UART2 0
+#endif

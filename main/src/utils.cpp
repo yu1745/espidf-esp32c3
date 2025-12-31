@@ -178,3 +178,17 @@ void list_root_directory() {
     closedir(dir);
     ESP_LOGI(TAG, "Total entries: %d", count);
 }
+
+void printBuildConfigOptions() {
+    const char* TAG = "BuildConfig";
+    ESP_LOGI(TAG, "========== 编译选项状态 ==========");
+    ESP_LOGI(TAG, "CONFIG_ENABLE_WIFI:    %s", CONFIG_ENABLE_WIFI ? "开启" : "关闭");
+    ESP_LOGI(TAG, "CONFIG_ENABLE_BLE:     %s", CONFIG_ENABLE_BLE ? "开启" : "关闭");
+    ESP_LOGI(TAG, "CONFIG_ENABLE_LED:     %s", CONFIG_ENABLE_LED ? "开启" : "关闭");
+    ESP_LOGI(TAG, "CONFIG_ENABLE_TEMP:    %s", CONFIG_ENABLE_TEMP ? "开启" : "关闭");
+    ESP_LOGI(TAG, "CONFIG_ENABLE_BUTTON:  %s", CONFIG_ENABLE_BUTTON ? "开启" : "关闭");
+    ESP_LOGI(TAG, "CONFIG_ENABLE_VOLTAGE: %s", CONFIG_ENABLE_VOLTAGE ? "开启" : "关闭");
+    ESP_LOGI(TAG, "CONFIG_ENABLE_DECOY:   %s", CONFIG_ENABLE_DECOY ? "开启" : "关闭");
+    ESP_LOGI(TAG, "CONFIG_ENABLE_MDNS:    %s", CONFIG_ENABLE_MDNS ? "开启" : "关闭");
+    ESP_LOGI(TAG, "====================================");
+}
