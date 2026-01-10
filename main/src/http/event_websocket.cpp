@@ -6,11 +6,15 @@
 #include "voltage.hpp"
 #include "globals.hpp"
 #include "http/websocket_server.h"
+#include "utils.hpp"
+#include "wifi.hpp"
 #include <cstring>
 #include <esp_event.h>
 #include <esp_http_server.h>
 #include <esp_log.h>
+#include <esp_netif.h>
 #include <esp_timer.h>
+#include <memory>
 #include <mutex>
 #include <vector>
 
@@ -85,6 +89,121 @@ static void voltage_event_to_json(char *buffer, size_t buffer_size,
            "\"adc_raw\":%d,"
            "\"timestamp\":%lld}",
            data->voltage, data->adc_raw, data->timestamp);
+}
+
+/**
+ * @brief 将版本信息转换为JSON字符串
+ */
+static void version_info_to_json(char *buffer, size_t buffer_size) {
+  try {
+    std::string version = getBuildParameters();
+    // 将原有JSON作为data子项嵌套
+    snprintf(buffer, buffer_size, "{\"type\":\"version\",\"data\":%s}",
+             version.c_str());
+  } catch (const std::exception &e) {
+    snprintf(buffer, buffer_size,
+             "{\"type\":\"version\",\"status\":\"error\",\"message\":\"%s\"}",
+             e.what());
+  }
+}
+
+/**
+ * @brief 将IP信息转换为JSON字符串
+ */
+static void ipinfo_to_json(char *buffer, size_t buffer_size) {
+  esp_netif_t *sta_netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+  esp_netif_t *ap_netif = esp_netif_get_handle_from_ifkey("WIFI_AP_DEF");
+
+  // 获取AP的IP信息
+  esp_netif_ip_info_t ap_ip_info;
+  bool ap_ip_valid = false;
+
+  if (ap_netif) {
+    esp_err_t ap_ret = esp_netif_get_ip_info(ap_netif, &ap_ip_info);
+    if (ap_ret == ESP_OK && ap_ip_info.ip.addr != 0) {
+      ap_ip_valid = true;
+    }
+  }
+
+  if (sta_netif) {
+    esp_netif_ip_info_t ip_info;
+    esp_err_t ret = esp_netif_get_ip_info(sta_netif, &ip_info);
+
+    if (ret == ESP_OK && ip_info.ip.addr != 0) {
+      // STA已连接，获取DNS信息
+      esp_netif_dns_info_t dns_info;
+      ret = esp_netif_get_dns_info(sta_netif, ESP_NETIF_DNS_MAIN, &dns_info);
+
+      if (ret == ESP_OK) {
+        if (ap_ip_valid) {
+          snprintf(buffer, buffer_size,
+                   "{\"type\":\"ipinfo\","
+                   "\"data\":{"
+                   "\"sta_ip\":\"" IPSTR "\",\"sta_subnet\":\"" IPSTR "\","
+                   "\"sta_gateway\":\"" IPSTR "\",\"sta_dns\":\"" IPSTR "\","
+                   "\"softap_ip\":\"" IPSTR "\"}}",
+                   IP2STR(&ip_info.ip), IP2STR(&ip_info.netmask),
+                   IP2STR(&ip_info.gw), IP2STR(&dns_info.ip.u_addr.ip4),
+                   IP2STR(&ap_ip_info.ip));
+        } else {
+          snprintf(buffer, buffer_size,
+                   "{\"type\":\"ipinfo\","
+                   "\"data\":{"
+                   "\"sta_ip\":\"" IPSTR "\",\"sta_subnet\":\"" IPSTR "\","
+                   "\"sta_gateway\":\"" IPSTR "\",\"sta_dns\":\"" IPSTR "\","
+                   "\"softap_ip\":\"未初始化\"}}",
+                   IP2STR(&ip_info.ip), IP2STR(&ip_info.netmask),
+                   IP2STR(&ip_info.gw), IP2STR(&dns_info.ip.u_addr.ip4));
+        }
+      } else {
+        // 获取DNS失败，使用IP作为默认DNS
+        if (ap_ip_valid) {
+          snprintf(buffer, buffer_size,
+                   "{\"type\":\"ipinfo\","
+                   "\"data\":{"
+                   "\"sta_ip\":\"" IPSTR "\",\"sta_subnet\":\"" IPSTR "\","
+                   "\"sta_gateway\":\"" IPSTR "\",\"sta_dns\":\"" IPSTR "\","
+                   "\"softap_ip\":\"" IPSTR "\"}}",
+                   IP2STR(&ip_info.ip), IP2STR(&ip_info.netmask),
+                   IP2STR(&ip_info.gw), IP2STR(&ip_info.ip),
+                   IP2STR(&ap_ip_info.ip));
+        } else {
+          snprintf(buffer, buffer_size,
+                   "{\"type\":\"ipinfo\","
+                   "\"data\":{"
+                   "\"sta_ip\":\"" IPSTR "\",\"sta_subnet\":\"" IPSTR "\","
+                   "\"sta_gateway\":\"" IPSTR "\",\"sta_dns\":\"" IPSTR "\","
+                   "\"softap_ip\":\"未初始化\"}}",
+                   IP2STR(&ip_info.ip), IP2STR(&ip_info.netmask),
+                   IP2STR(&ip_info.gw), IP2STR(&ip_info.ip));
+        }
+      }
+    } else {
+      // STA未连接
+      if (ap_ip_valid) {
+        snprintf(buffer, buffer_size,
+                 "{\"type\":\"ipinfo\","
+                 "\"data\":{\"sta_ip\":\"未连接\",\"softap_ip\":\"" IPSTR "\"}}",
+                 IP2STR(&ap_ip_info.ip));
+      } else {
+        snprintf(buffer, buffer_size,
+                 "{\"type\":\"ipinfo\","
+                 "\"data\":{\"sta_ip\":\"未连接\",\"softap_ip\":\"未初始化\"}}");
+      }
+    }
+  } else {
+    // STA netif不存在
+    if (ap_ip_valid) {
+      snprintf(buffer, buffer_size,
+               "{\"type\":\"ipinfo\","
+               "\"data\":{\"sta_ip\":\"未连接\",\"softap_ip\":\"" IPSTR "\"}}",
+               IP2STR(&ap_ip_info.ip));
+    } else {
+      snprintf(buffer, buffer_size,
+               "{\"type\":\"ipinfo\","
+               "\"data\":{\"sta_ip\":\"未连接\",\"softap_ip\":\"未初始化\"}}");
+    }
+  }
 }
 
 /**
@@ -173,7 +292,12 @@ static esp_err_t event_websocket_handler(httpd_req_t *req) {
     }
 
     // 发送当前 USB 状态给新连接的客户端
-    char usb_status_json[256];
+    std::unique_ptr<char[]> usb_status_json(new (std::nothrow) char[256]);
+    if (!usb_status_json) {
+      ESP_LOGE(TAG, "分配USB状态缓冲区失败");
+      return ESP_OK;
+    }
+
     bool usb_connected = uart_is_usb_connected();
     int32_t event_id = usb_connected ? USB_MONITOR_EVENT_CONNECTED
                                       : USB_MONITOR_EVENT_DISCONNECTED;
@@ -182,12 +306,34 @@ static esp_err_t event_websocket_handler(httpd_req_t *req) {
         .timestamp = esp_timer_get_time(),
     };
 
-    usb_event_to_json(usb_status_json, sizeof(usb_status_json), event_id,
-                      &usb_data);
-    websocket_send_to_client(g_http_server, client_fd, usb_status_json,
-                             strlen(usb_status_json));
+    usb_event_to_json(usb_status_json.get(), 256, event_id, &usb_data);
+    websocket_send_to_client(g_http_server, client_fd, usb_status_json.get(),
+                             strlen(usb_status_json.get()));
     ESP_LOGI(TAG, "已发送当前USB状态给客户端 %d: %s", client_fd,
-             usb_status_json);
+             usb_status_json.get());
+
+    // 发送版本信息给新连接的客户端
+    std::unique_ptr<char[]> version_json(new (std::nothrow) char[1024]);
+    if (version_json) {
+      version_info_to_json(version_json.get(), 1024);
+      websocket_send_to_client(g_http_server, client_fd, version_json.get(),
+                               strlen(version_json.get()));
+      ESP_LOGI(TAG, "已发送版本信息给客户端 %d", client_fd);
+    } else {
+      ESP_LOGE(TAG, "分配版本信息缓冲区失败");
+    }
+
+    // 发送 IP 信息给新连接的客户端
+    std::unique_ptr<char[]> ipinfo_json(new (std::nothrow) char[512]);
+    if (ipinfo_json) {
+      ipinfo_to_json(ipinfo_json.get(), 512);
+      websocket_send_to_client(g_http_server, client_fd, ipinfo_json.get(),
+                               strlen(ipinfo_json.get()));
+      ESP_LOGI(TAG, "已发送IP信息给客户端 %d: %s", client_fd,
+               ipinfo_json.get());
+    } else {
+      ESP_LOGE(TAG, "分配IP信息缓冲区失败");
+    }
 
     return ESP_OK;
   }
