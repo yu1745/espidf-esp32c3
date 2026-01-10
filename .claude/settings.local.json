@@ -16,7 +16,13 @@
       "Bash(cmd.exe /c \"powershell.exe -ExecutionPolicy Bypass -File idf.py.ps1 build\")",
       "Bash(idf.py build:*)",
       "Bash(export:*)",
-      "Bash(git mv:*)"
+      "Bash(git mv:*)",
+      "Bash(git check-ignore:*)",
+      "Bash(cat:*)",
+      "Bash(git ls-tree:*)",
+      "Bash(git submodule status:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ]
   }
 }
