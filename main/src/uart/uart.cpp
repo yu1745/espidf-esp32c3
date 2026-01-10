@@ -118,7 +118,7 @@ void uart_handle_data(void) {
     data_packet_t *packet = (data_packet_t *)malloc(sizeof(data_packet_t));
     if (packet != NULL) {
       packet->source = DATA_SOURCE_UART;
-      packet->client_fd = -1;   // UART没有客户端文件描述符
+      packet->client_fd = -1;   // UART没有客户端文件描述符 //todo 改成有
       packet->user_data = NULL; // UART不需要user_data
       packet->data = (uint8_t *)malloc(bytes_read);
       if (packet->data != NULL) {
