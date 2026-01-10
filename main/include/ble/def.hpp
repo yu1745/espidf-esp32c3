@@ -4,7 +4,6 @@
 #include "ble_router.hpp"
 #include "decoy.hpp"
 #include "esp_netif.h"
-#include "esp_system.h"
 #include "esp_netif_types.h"
 #include "executor/executor_factory.hpp"
 #include "globals.hpp"
@@ -544,28 +543,6 @@ READ_WRITE_CHR(
       }
     },
     nullptr)
-// /api/restart
-WRITE_CHR(
-    &tcode_restart_uuid.u,
-    [](uint16_t conn_handle, uint16_t attr_handle,
-       struct ble_gatt_access_ctxt *ctxt, void *arg) -> int {
-      static const char *TAG = "BLE_RESTART";
-
-      switch (ctxt->op) {
-      case BLE_GATT_ACCESS_OP_WRITE_CHR: {
-        // 对应HTTP GET /api/restart
-        // 任意写入值都会触发重启
-        ESP_LOGI(TAG, "收到重启请求，正在重启设备...");
-        esp_restart();
-        // 注意：esp_restart() 不会立即返回，但为了编译正确，我们保留返回语句
-        vTaskDelay(pdMS_TO_TICKS(1000));
-        return 0;
-      }
-      default:
-        return BLE_ATT_ERR_UNLIKELY;
-      }
-    },
-    nullptr)
 BLE_SERVICE_END()
 
 // Handy服务注册
@@ -586,7 +563,8 @@ WRITE_CHR(
           // 将数据写入handy队列
           if (handy_queue != nullptr) {
             // 分配std::string对象
-            std::string* data = new std::string((char*)handy_chr_val, ctxt->om->om_len);
+            std::string *data =
+                new std::string((char *)handy_chr_val, ctxt->om->om_len);
 
             // 发送到队列
             if (xQueueSend(handy_queue, &data, pdMS_TO_TICKS(100)) != pdTRUE) {
@@ -594,7 +572,8 @@ WRITE_CHR(
               delete data;
               ESP_LOGW(TAG, "Failed to send handy data to handy queue");
             } else {
-              ESP_LOGD(TAG, "Sent handy data to queue, size: %d", ctxt->om->om_len);
+              ESP_LOGD(TAG, "Sent handy data to queue, size: %d",
+                       ctxt->om->om_len);
             }
           } else {
             ESP_LOGW(TAG, "handy_queue is null, cannot send handy data");
@@ -626,7 +605,8 @@ WRITE_CHR(
           // 将数据写入handy队列
           if (handy_queue != nullptr) {
             // 分配std::string对象
-            std::string* data = new std::string((char*)handy_chr_val2, ctxt->om->om_len);
+            std::string *data =
+                new std::string((char *)handy_chr_val2, ctxt->om->om_len);
 
             // 发送到队列
             if (xQueueSend(handy_queue, &data, pdMS_TO_TICKS(100)) != pdTRUE) {
@@ -634,7 +614,8 @@ WRITE_CHR(
               delete data;
               ESP_LOGW(TAG, "Failed to send handy data to handy queue");
             } else {
-              ESP_LOGD(TAG, "Sent handy data to queue, size: %d", ctxt->om->om_len);
+              ESP_LOGD(TAG, "Sent handy data to queue, size: %d",
+                       ctxt->om->om_len);
             }
           } else {
             ESP_LOGW(TAG, "handy_queue is null, cannot send handy data");
