@@ -15,7 +15,7 @@ from collections import deque
 
 
 class TCPClient:
-    def __init__(self, host="192.168.5.205", port=8080):
+    def __init__(self, host="192.168.5.210", port=8080):
         """
         初始化TCP客户端
 
