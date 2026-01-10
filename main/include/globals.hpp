@@ -20,6 +20,7 @@ extern httpd_handle_t g_http_server;
 extern bool g_wifi_connected;
 extern bool g_http_server_running;
 extern bool g_websocket_server_running;
+extern bool g_system_initialized; // 系统初始化完成标志（所有模块初始化完成后为true）
 
 // UART队列声明
 extern QueueHandle_t uart_rx_queue;

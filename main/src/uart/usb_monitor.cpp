@@ -3,6 +3,7 @@
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/timers.h"
+#include "globals.hpp"
 #include "led.hpp"
 #include "uart/uart.h"
 #include "utils.hpp"
@@ -13,8 +14,10 @@ ESP_EVENT_DEFINE_BASE(USB_MONITOR_EVENT);
 
 // 内置USB事件处理器
 // 根据USB连接状态控制LED：
-// - USB未连接：绿灯开关量闪烁（亮-灭）
+// - USB未连接：绿灯闪烁（亮-灭）
 // - USB已连接：绿灯常亮
+// 注意：只有在系统初始化完成后（g_system_initialized == true）才控制LED
+//       初始化期间，LED由main.cpp和其他模块控制
 static void usb_event_handler_internal(void *handler_arg,
                                        esp_event_base_t event_base,
                                        int32_t event_id, void *event_data) {
@@ -22,12 +25,18 @@ static void usb_event_handler_internal(void *handler_arg,
     return;
   }
 
+  // 只有在系统初始化完成后才控制LED
+  if (!g_system_initialized) {
+    ESP_LOGI("UsbMonitor", "System not fully initialized, USB monitor not controlling LED yet");
+    return;
+  }
+
   if (event_id == USB_MONITOR_EVENT_CONNECTED) {
     ESP_LOGI("UsbMonitor", "USB connected - LED green solid");
     Led::getInstance()->setSuccess(); // 绿灯常亮
   } else if (event_id == USB_MONITOR_EVENT_DISCONNECTED) {
-    ESP_LOGI("UsbMonitor", "USB disconnected - LED green on-off blinking");
-    Led::getInstance()->setBlinkOnOff(2000); // 绿灯开关量闪烁（2秒周期）
+    ESP_LOGI("UsbMonitor", "USB disconnected - LED green blinking");
+    Led::getInstance()->setBlink(1000); // 绿灯闪烁（1秒周期）
   }
 }
 
@@ -39,10 +48,23 @@ esp_err_t usb_monitor_init(void) {
     if (!UsbMonitor::getInstance().init()) {
       return ESP_FAIL;
     }
-    ESP_LOGI("UsbMonitor", "USB monitor initialized successfully");
+    ESP_LOGI("UsbMonitor", "USB monitor initialized successfully (timer not started)");
     return ESP_OK;
   } catch (const std::exception &e) {
     ESP_LOGE("UsbMonitor", "Failed to initialize USB monitor: %s", e.what());
+    return ESP_FAIL;
+  }
+}
+
+esp_err_t usb_monitor_start(void) {
+  try {
+    if (!UsbMonitor::getInstance().start()) {
+      return ESP_FAIL;
+    }
+    ESP_LOGI("UsbMonitor", "USB monitor started successfully");
+    return ESP_OK;
+  } catch (const std::exception &e) {
+    ESP_LOGE("UsbMonitor", "Failed to start USB monitor: %s", e.what());
     return ESP_FAIL;
   }
 }
@@ -101,19 +123,34 @@ bool UsbMonitor::init() {
     return false;
   }
 
-  // 初始化定时器
-  if (!initTimer()) {
-    ESP_LOGE(TAG, "Failed to initialize timer");
-    return false;
-  }
-
-  // 获取初始连接状态
+  // 获取初始连接状态（不启动定时器）
   m_last_connected = uart_is_usb_connected();
   ESP_LOGI(TAG, "Initial USB connection state: %s",
            m_last_connected ? "connected" : "disconnected");
 
   m_initialized = true;
-  ESP_LOGI(TAG, "USB monitor initialized successfully");
+  ESP_LOGI(TAG, "USB monitor initialized (call start() to begin monitoring)");
+  return true;
+}
+
+bool UsbMonitor::start() {
+  if (!m_initialized) {
+    ESP_LOGE(TAG, "USB monitor not initialized");
+    return false;
+  }
+
+  if (m_timer != nullptr) {
+    ESP_LOGW(TAG, "USB monitor timer already started");
+    return true;
+  }
+
+  // 初始化并启动定时器
+  if (!initTimer()) {
+    ESP_LOGE(TAG, "Failed to initialize timer");
+    return false;
+  }
+
+  ESP_LOGI(TAG, "USB monitor timer started");
   return true;
 }
 

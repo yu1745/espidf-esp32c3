@@ -7,6 +7,7 @@ httpd_handle_t g_http_server = NULL;
 bool g_wifi_connected = false;
 bool g_http_server_running = false;
 bool g_websocket_server_running = false;
+bool g_system_initialized = false; // 初始为false，main.cpp中所有模块初始化完成后设置为true
 
 // UART队列定义
 QueueHandle_t uart_rx_queue = NULL;

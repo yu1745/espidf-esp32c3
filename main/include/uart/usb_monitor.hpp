@@ -24,16 +24,28 @@ typedef struct {
 } usb_monitor_event_data_t;
 
 /**
- * @brief 初始化USB监控模块
+ * @brief 初始化USB监控模块（不启动定时器）
  *
- * 创建定时器，每秒检测一次USB连接状态
- * 连接状态变化时会发布USB事件到默认事件循环
+ * 创建定时器和事件循环，但不启动监控
+ * 需要调用 usb_monitor_start() 来启动监控
  *
  * @return esp_err_t
  *         - ESP_OK: 初始化成功
  *         - ESP_FAIL: 初始化失败
  */
 esp_err_t usb_monitor_init(void);
+
+/**
+ * @brief 启动USB监控定时器
+ *
+ * 启动定时器，开始监控USB连接状态
+ * 应在所有模块初始化完成后调用
+ *
+ * @return esp_err_t
+ *         - ESP_OK: 启动成功
+ *         - ESP_FAIL: 启动失败
+ */
+esp_err_t usb_monitor_start(void);
 
 /**
  * @brief 注册USB事件处理器
@@ -77,10 +89,16 @@ public:
     static UsbMonitor& getInstance();
 
     /**
-     * @brief 初始化USB监控
+     * @brief 初始化USB监控（不启动定时器）
      * @return true 初始化成功，false 初始化失败
      */
     bool init();
+
+    /**
+     * @brief 启动USB监控定时器
+     * @return true 启动成功，false 启动失败
+     */
+    bool start();
 
     /**
      * @brief 反初始化
