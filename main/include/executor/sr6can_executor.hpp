@@ -1,107 +1,123 @@
 #pragma once
 
+#include <cmath>
+#include <memory>
+#include <mutex>
+#include <vector>
+// #include "Arduino.h"  // Removed for ESP-IDF
+#include "ctw/ctw.hpp"
 #include "executor.hpp"
 #include "pid.hpp"
-#include <mutex>
+#include "setting.hpp"
 
-// SR6 CAN伺服电机数量
+#ifndef SR6CANServoNum
 #define SR6CANServoNum 6
+#endif
+
+#if SR6CANServoNum <= 6
 #define SR6CANArrLen 6
+#else
+#define SR6CANArrLen SR6CANServoNum
+#endif
 
-/**
- * @brief SR6CAN执行器类
- *
- * 继承自Executor，用于通过CAN总线控制6个MIT协议电机实现SR6运动
- */
 class SR6CANExecutor : public Executor {
-public:
-    /**
-     * @brief 构造函数
-     * @param setting 设置配置
-     */
-    explicit SR6CANExecutor(const SettingWrapper& setting);
-
-    /**
-     * @brief 析构函数
-     */
+   public:
+    SR6CANExecutor(const SettingWrapper& setting);
     ~SR6CANExecutor() override;
 
-
-    /**
-     * @brief 获取执行频率
-     * @return 执行频率
-     */
-    int getExecuteFrequency() const;
-
-protected:
-    /**
-     * @brief 计算电机目标位置
-     */
+   protected:
     void compute() override;
-
-    /**
-     * @brief 执行电机控制
-     */
     void execute() override;
 
-private:
-    /**
-     * @brief 初始化电机
-     */
+   private:
+    // 初始化状态枚举
+    enum class InitState {
+        WAITING_STABILITY,  // 等待位置稳定
+        HOMING,             // 回原点中
+        RUNNING             // 正常运行
+    };
+
+    // 静态成员变量
+    static const char* TAG;
+    static bool ctw_initialized_;
+    static std::mutex init_mutex_;
+
+    // 初始化状态
+    InitState init_state_ = InitState::WAITING_STABILITY;
+    unsigned long init_start_time_ = 0;
+    bool homing_completed_ = false;
+    unsigned long homing_start_time_ = 0;
+    float homing_target_positions[SR6CANArrLen] = {};
+
+    // 电机位置（弧度）
+    double motor_position[SR6CANArrLen];
+
+    float motor_position_feedback[SR6CANArrLen] = {};
+    std::mutex compute_mutex_;
+    std::mutex feedback_mutex_;
+
+    // // MIT控制参数数组（每个电机的Kp, Ki, Kd, offset）
+    // float motor_kp[SR6CANArrLen];
+    // float motor_ki[SR6CANArrLen];
+    // float motor_kd[SR6CANArrLen];
+    float motor_offset[SR6CANArrLen]; /* 角度，不是弧度 */
+    float motor_feedback_offset[SR6CANArrLen] = {};
+    int stable[6] = {};
+    uint32_t last_feedback_update_times[SR6CANArrLen] = {};  // 记录上次反馈更新时间
+
+    // 初始化电机
     void initMotors();
 
+    // 初始化电机PID参数
+    void initMotorParams();
+
     /**
-     * @brief 计算主舵机角度
-     * @param x 目标x坐标（1/100 mm）
-     * @param y 目标y坐标（1/100 mm）
-     * @return 舵机输出值(弧度)
+     * @brief 设置主伺服角度
+     *
+     * @param x
+     * @param y
+     * @return float 弧度
      */
     float SetMainServo(float x, float y);
 
     /**
-     * @brief 计算俯仰舵机角度
-     * @param x 目标x坐标（1/100 mm）
-     * @param y 目标y坐标（1/100 mm）
-     * @param z 目标z坐标（1/100 mm）
-     * @param pitch 俯仰角度（1/100 度）
-     * @return 舵机输出值(弧度)
+     * @brief 设置俯仰伺服角度
+     *
+     * @param x
+     * @param y
+     * @param z
+     * @param pitch
+     * @return float 弧度
      */
     float SetPitchServo(float x, float y, float z, float pitch);
 
     /**
-     * @brief CAN接收任务
-     * @param param 任务参数
+     * @brief 从CTW更新反馈数据，包括处理稳定计数和偏移
      */
-    static void canReceiveTask(void* param);
+    void updateFeedbackFromCTW();
 
-    // 电机位置目标值（弧度）
-    float motor_position[SR6CANArrLen];
-    
-    // 电机位置反馈值（弧度）
-    float motor_position_feedback[SR6CANArrLen];
-    
-    // PID控制器数组
-    pid_controller_t motor_pid[SR6CANArrLen];
-    
-    // MIT控制参数
-    float motor_kp[SR6CANArrLen];
-    float motor_ki[SR6CANArrLen];
-    float motor_kd[SR6CANArrLen];
-    float motor_offset[SR6CANArrLen];  // 角度，不是弧度
-    
-    // CAN接收任务句柄
-    TaskHandle_t can_receive_task_handle_;
-    
-    // 互斥锁
-    std::mutex compute_mutex_;
-    std::mutex feedback_mutex_;
-    
-    // 初始化完成标志
-    bool init_done;
-    
-    // 静态成员变量
-    static const char* TAG;
-    static bool mit_initialized_;
-    static std::mutex init_mutex_;
+    /**
+     * @brief 检查是否所有电机都已稳定
+     * @return true 所有电机都已稳定
+     * @return false 至少有一个电机未稳定
+     */
+    bool isAllMotorsStable() const;
+
+    /**
+     * @brief 打印未稳定的电机信息
+     */
+    void printUnstableMotors() const;
+
+    /**
+     * @brief 执行回原点操作
+     */
+    void performHoming();
+
+    /**
+     * @brief 检查回原点是否完成
+     * @return true 回原点完成
+     * @return false 回原点未完成
+     */
+    bool isHomingComplete();
+    int getExecuteFrequency();
 };
-

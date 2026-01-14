@@ -155,7 +155,7 @@ void O6Executor::compute() {
   // Use O6 kinematics solver to calculate 6 servo angles
   // Note: z offset needs adjustment: z + 19.3 - O6_OFFSET
   auto result =
-      geometry::solve_robot_kinematics(x, y, z + 19.3, roll, pitch, yaw);
+      geometry::solve_robot_kinematics(x, y, z + 18.1, roll, pitch, yaw);
 
   if (result) {
     m_theta_values = *result;

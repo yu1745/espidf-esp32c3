@@ -1,6 +1,6 @@
 #include "pid.hpp"
 
-void pid_init(pid_controller_t* pid, float kp, float ki, float kd, float max_integral) {
+void pid_init(pid_context_t* pid, float kp, float ki, float kd, float integral_max) {
     if (pid == nullptr) {
         return;
     }
@@ -9,16 +9,16 @@ void pid_init(pid_controller_t* pid, float kp, float ki, float kd, float max_int
     pid->kd = kd;
     pid->integral = 0.0f;
     pid->last_error = 0.0f;
-    pid->max_integral = max_integral;
+    pid->integral_max = integral_max;
 }
 
-float pid_update(pid_controller_t* pid, float setpoint, float current_value) {
+float pid_update(pid_context_t* pid, float setpoint, float feedback) {
     if (pid == nullptr) {
         return 0.0f;
     }
 
     // 计算误差
-    float error = setpoint - current_value;
+    float error = setpoint - feedback;
 
     // 比例项
     float p_term = pid->kp * error;
@@ -26,10 +26,10 @@ float pid_update(pid_controller_t* pid, float setpoint, float current_value) {
     // 积分项
     pid->integral += error;
     // 积分限幅
-    if (pid->integral > pid->max_integral) {
-        pid->integral = pid->max_integral;
-    } else if (pid->integral < -pid->max_integral) {
-        pid->integral = -pid->max_integral;
+    if (pid->integral > pid->integral_max) {
+        pid->integral = pid->integral_max;
+    } else if (pid->integral < -pid->integral_max) {
+        pid->integral = -pid->integral_max;
     }
     float i_term = pid->ki * pid->integral;
 

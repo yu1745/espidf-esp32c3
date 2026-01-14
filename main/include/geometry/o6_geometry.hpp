@@ -335,7 +335,7 @@ Direction2D operator/(const Direction2D &lhs, double scalar);
 std::optional<std::array<double, 6>>
 solve_robot_kinematics(double x, double y, double z, double roll_deg,
                        double pitch_deg, double yaw_deg, double r = 4.9,
-                       double arm = 6.5, double link = 21.0,
+                       double arm = 9.0, double link = 21.0,
                        Point3D a = {7.8, -1.25, 0}, Point3D b = {7.8, 1.25, 0});
 
 } // namespace geometry

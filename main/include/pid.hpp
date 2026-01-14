@@ -2,34 +2,42 @@
 
 #include <cstdint>
 
-/**
- * @brief PID控制器结构体
- */
-typedef struct {
-    float kp;        // 比例系数
-    float ki;        // 积分系数
-    float kd;        // 微分系数
-    float integral;  // 积分累积值
-    float last_error; // 上次误差
-    float max_integral; // 积分限幅
-} pid_controller_t;
+// 位置模式PID结构体
+struct pid_context_t {
+    float kp;            // 比例增益
+    float ki;            // 积分增益
+    float kd;            // 微分增益
+    float integral;      // 积分值
+    float integral_max;  // 积分限幅
+    float last_error;    // 上一次误差
+    uint32_t last_time;  // 上一次更新时间(微秒)
+    float dt;            // 时间间隔(秒)
+    bool compare(void* other) const;
+};
 
 /**
- * @brief 初始化PID控制器
- * @param pid PID控制器指针
- * @param kp 比例系数
- * @param ki 积分系数
- * @param kd 微分系数
- * @param max_integral 积分限幅
+ * @brief 初始化 PID 控制器参数
+ *
+ * @param pid PID 上下文
+ * @param kp 比例增益
+ * @param ki 积分增益
+ * @param kd 微分增益
+ * @param integral_max 积分限幅
  */
-void pid_init(pid_controller_t* pid, float kp, float ki, float kd, float max_integral);
+
+void pid_init(pid_context_t* pid,
+              float kp,
+              float ki,
+              float kd,
+              float integral_max);
 
 /**
- * @brief 更新PID控制器
- * @param pid PID控制器指针
+ * @brief PID 计算函数
+ *
+ * @param pid PID 上下文
  * @param setpoint 目标值
- * @param current_value 当前值
- * @return PID输出值
+ * @param feedback 反馈值
+ * @return float 控制输出
  */
-float pid_update(pid_controller_t* pid, float setpoint, float current_value);
 
+float pid_update(pid_context_t* pid, float setpoint, float feedback);
