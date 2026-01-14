@@ -33,7 +33,7 @@ jobs:
         
     - name: Build project
       run: |
-        idf.py build
+        idf.py -D IDF_TOOLCHAIN=clang build
         
     - name: Merge binary files
       run: |
