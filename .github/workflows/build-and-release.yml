@@ -41,8 +41,9 @@ jobs:
         cp build/partition_table/partition-table.bin release/
         cp build/ota_data_initial.bin release/
         cp build/spiffs.bin release/
-        tar -czf release/firmware.tar.gz -C release .
-        zip -j release/firmware.zip release/*.bin
+        tar -czf firmware.tar.gz -C release .
+        mv firmware.tar.gz release/
+        cd release && zip -j firmware.zip *.bin
         
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
