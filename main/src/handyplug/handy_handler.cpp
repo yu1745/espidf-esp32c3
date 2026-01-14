@@ -24,7 +24,7 @@ static std::string generateTCode(double position, uint32_t duration) {
   // 将0.0-1.0映射到0-999
   int value = static_cast<int>(std::round(position * 999.0));
   char cmdStr[32];
-  snprintf(cmdStr, sizeof(cmdStr), "L0%dI%d", value, duration);
+  snprintf(cmdStr, sizeof(cmdStr), "L0%dI%d", value, static_cast<int>(duration));
   return std::string(cmdStr);
 }
 
