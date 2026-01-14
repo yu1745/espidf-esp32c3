@@ -21,19 +21,18 @@ jobs:
       with:
         python-version: '3.11'
         
-    - name: Install ESP-IDF
+    - name: ESP-IDF build
       uses: espressif/esp-idf-ci-action@v1
       with:
         esp_idf_version: 'v5.5.1'
         target: 'esp32c3'
-        command: 'idf.py --version'
-    - name: Build project
-      run: |
-        idf.py -D IDF_TOOLCHAIN=clang build
-    - name: Merge binary files
-      working-directory: build
-      run: |
-        esptool.py merge_bin -o merged.bin @flash_args
+        command: 'idf.py -D IDF_TOOLCHAIN=clang build'
+    - name: ESP-IDF merge bin
+      uses: espressif/esp-idf-ci-action@v1
+      with:
+        esp_idf_version: 'v5.5.1'
+        target: 'esp32c3'
+        command: 'esptool.py merge_bin -o merged.bin @flash_args'
     - name: Create release archive
       run: |
         mkdir -p release
